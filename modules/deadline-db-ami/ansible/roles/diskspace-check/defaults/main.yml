@@ -1,0 +1,5 @@
+---
+# defaults file for diskspace-check
+
+mountname: '/'
+ignore_errors: false

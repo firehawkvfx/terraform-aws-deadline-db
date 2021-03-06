@@ -1,0 +1,88 @@
+- stat:
+    path: "/opt/Thinkbox/DeadlineDatabase10/mongo/data/logs/"
+  register: result
+
+- name: Get files in a folder /opt/Thinkbox/DeadlineDatabase10/mongo/data/logs/
+  find:
+    paths: "/opt/Thinkbox/DeadlineDatabase10/mongo/data/logs/"
+  register: found_files
+  become: true
+  no_log: true
+  when: result.stat.exists
+  
+- name: Get latest file
+  set_fact:
+    latest_file: "{{ found_files.files | sort(attribute='mtime',reverse=true) | first }}"
+  when: result.stat.exists
+
+- name: "Get file {{ latest_file.path }} copy to {{ firehawk_path }}/tmp/{{ out_file }}"
+  fetch:
+    src: "{{ latest_file.path }}"
+    dest: "{{ firehawk_path }}/tmp/log/{{ out_file }}"
+    flat: yes
+    validate_checksum: no # logs may have incorrect checksums, possibly since data changes rapidly after download.
+  become: true
+  when: result.stat.exists
+
+- name: 'Get all files: file {{ item.path }} copy to {{ firehawk_path }}/tmp/'
+  fetch:
+    src: "{{ item.path }}"
+    dest: "{{ firehawk_path }}/tmp/log/"
+    flat: yes
+    validate_checksum: no # logs may have incorrect checksums, possibly since data changes rapidly after download.
+  become: true
+  with_items: "{{ found_files.files }}"
+  no_log: true
+  when: result.stat.exists
+
+# get logs from tmp
+- stat:
+    path: "/tmp/"
+  become: true
+  register: result
+
+- name: Get files in a folder /tmp/
+  find:
+    paths: "/tmp/"
+    patterns: "*.log"
+  register: found_files
+  become: true
+  no_log: true
+  when: result.stat.exists
+
+- name: 'Get all files: file {{ item.path }} copy to {{ firehawk_path }}/tmp/'
+  fetch:
+    src: "{{ item.path }}"
+    dest: "{{ firehawk_path }}/tmp/log/"
+    flat: yes
+    validate_checksum: no # logs may have incorrect checksums, possibly since data changes rapidly after download.
+  become: true
+  with_items: "{{ found_files.files }}"
+  no_log: true
+  when: result.stat.exists
+
+# get logs from /var/log/Thinkbox/Deadline[VERSION]
+- stat:
+    path: "/var/log/Thinkbox/Deadline10/"
+  become: true
+  register: result
+
+- name: Get files in a folder /var/log/Thinkbox/Deadline10/
+  find:
+    paths: "/var/log/Thinkbox/Deadline10/"
+    patterns: "*.log"
+  register: found_files
+  become: true
+  no_log: true
+  when: result.stat.exists
+
+- name: 'Get all files: file {{ item.path }} copy to {{ firehawk_path }}/tmp/'
+  fetch:
+    src: "{{ item.path }}"
+    dest: "{{ firehawk_path }}/tmp/log/"
+    flat: yes
+    validate_checksum: no # logs may have incorrect checksums, possibly since data changes rapidly after download.
+  become: true
+  with_items: "{{ found_files.files }}"
+  no_log: true
+  when: result.stat.exists

@@ -1,0 +1,8 @@
+---
+- hosts: ansible_control
+  gather_facts: "{{ variable_gather_facts | default('false') }}"
+  become: true
+  any_errors_fatal: true
+
+  roles:
+    - role: deadlinedb

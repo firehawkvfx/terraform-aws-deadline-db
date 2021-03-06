@@ -1,0 +1,157 @@
+---
+# tasks file for roles/newuser
+
+- name: Collect some facts only for ansible_distribution
+  setup:
+    gather_subset:
+      - '!all'
+      - 'min'
+  tags:
+  - always
+
+- name: change hostname
+  hostname:
+    name: "{{ hostname }}"
+  when: set_hostname
+    
+- name: add myself to /etc/hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '^127\.0\.0\.1[ \t]+localhost'
+    line: "127.0.0.1 localhost {{ hostname }}"
+    state: present
+  when: set_hostname
+
+- name: Set hostname var in bash profile
+  lineinfile:
+    path: /root/.bash_profile
+    line: 'export HOSTNAME={{ hostname }}'
+  when: set_hostname
+
+- name: Disable SELinux # Disable SELINUX for some hosts not exposed to public internet - it can often cause issues with various systems like PDGMQ, licensing, and PCOIP.  May try permissive mode in future.
+  selinux:
+    state: "{{ set_selinux }}"
+  when: set_selinux != "unchanged"
+  vars:
+    ansible_python_interpreter: "{{ package_python_interpreter }}"
+
+  
+- stat:
+    path: "/home/{{ variable_user }}"
+  register: result
+
+- debug:
+    msg: "{{ variable_user }} home directory exists already.  Will not create user or make any changes.  The password was not changed/set."
+  when: result.stat.exists == true and result.stat.isdir == true
+
+- debug:
+    msg: "{{ variable_user }} home directory doesn't exist.  Will create user and set password."
+  when: result.stat.exists == false
+
+- name: "Create a login user - {{ variable_user }}" # See this item for further info https://stackoverflow.com/questions/19292899/creating-a-new-user-and-password-with-ansible
+  user:
+    name: "{{ variable_user }}"
+    uid: "{{ variable_uid }}"
+    password: "{{ my_password }}"
+    # groups: admin append=yes
+    state: present
+    shell: /bin/bash # Defaults to /bin/bash
+    system: no # Defaults to no
+    createhome: yes # Defaults to yes
+  when: result.stat.exists == false
+
+- name: "Set login user password - {{ variable_user }}"
+  user:
+    name: "{{ variable_user }}"
+    password: "{{ my_password }}"
+  when: result.stat.exists == true
+  become: true
+
+- name: Ensure primary group for user exists
+  group:
+    name: "{{ variable_user }}"
+    state: present
+    gid: "{{ variable_user_gid }}"
+
+- name: 'adding existing user {{ variable_user }} to group wheel'
+  user:
+    name: "{{ variable_user }}"
+    groups: wheel
+    append: yes
+  when: ( ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat' ) and ( sudo | bool )
+
+- name: 'adding existing user {{ variable_user }} to group sudo'
+  user:
+    name: "{{ variable_user }}"
+    groups: sudo
+    append: yes
+  when: ( ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu' ) and ( sudo | bool )
+
+# - getent:
+#     database: passwd
+#     key: centos
+#     fail_key: False
+
+# - name: check if centos user exists
+#   debug:
+#     var: getent_passwd['centos']
+
+# - name: change the default centos user passwd
+#   user:
+#     name: centos
+#     password: "{{ my_password }}"
+#   when: getent_passwd['centos'] is defined
+
+# - name: change the default ubuntu user passwd
+#   user:
+#     name: ubuntu
+#     password: "{{ my_password }}"
+#   when: getent_passwd['ubuntu'] is defined
+
+- name: create dir
+  file: 
+    path: "/home/{{ variable_user }}/.ansible"
+    state: directory
+    mode: '0700'
+    owner: "{{ variable_user }}"
+    group: "{{ variable_user }}"
+  become: true
+
+- name: create dir
+  file: 
+    path: "/home/{{ variable_user }}/.ansible/tmp"
+    state: directory
+    mode: '0700'
+    owner: "{{ variable_user }}"
+    group: "{{ variable_user }}"
+  become: true
+
+- name: 'generate ssh key for {{ variable_user }}'
+  shell: |
+    df -h
+    ssh-keygen -q -t rsa -f /home/{{ variable_user }}/.ssh/id_rsa -C "" -N ""
+  args:
+    creates: '/home/{{ variable_user }}/.ssh/id_rsa'
+  become_user: '{{ variable_user }}'
+  when: create_ssh_key | bool
+
+- name: "insert/update block in /home/{{ variable_user }}/.bashrc and home/deployuser/.bashrc"
+  blockinfile:
+    path: "{{ item }}"
+    backup: yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK ALIASES"
+    block: |
+      ### These lines are created by the new user playbook. ansible-playbook -i ansible/inventory ansible/newuser_deadlineuser.yaml --tags "newuser"
+      
+      showenv='. /deployuser/showenv.sh'
+      ec2_list_running='aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId]' --filters Name=instance-state-name,Values=running --output text'
+  with_items:
+    - /home/{{ variable_user }}/.bashrc
+  # vars:
+  #   ansible_python_interpreter: "{{ package_python_interpreter }}"
+
+- name: adding a new user requires a restart of pcoip service if present
+  shell: |
+    systemctl restart pcoip
+  become: true
+  when: pcoip

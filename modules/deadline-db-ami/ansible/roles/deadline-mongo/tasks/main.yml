@@ -1,0 +1,276 @@
+- name: Collect some facts only for ansible_distribution
+  setup:
+    gather_subset:
+      - '!all'
+      - 'min'
+  tags:
+  - always
+
+- name: change hostname
+  hostname:
+    name: "{{ set_hostname }}"
+  when: set_hostname is defined
+
+- name: Update hosts file with regex if ubuntu to handle correctly.  Otherwise this https://github.com/ansible/ansible-modules-core/issues/2308
+  lineinfile:
+    dest: /etc/hosts
+    line: "127.0.0.1       localhost       localhost.localdomain       {{ set_hostname }}"
+    regexp: '^127\.0\.0\.1.*localhost.*'
+    # regexp: "^127\.0\.0\.1.*localhost.*$"
+  when: set_hostname is defined and ( ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu' )
+
+- name: set preserve hostname in cloud.cfg
+  lineinfile:
+    dest: /etc/cloud/cloud.cfg
+    line: "preserve_hostname: true"
+    regexp: ".*preserve_hostname.*"
+  when: set_hostname is defined and ( ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu' )
+
+- name: "Ensure a key exists" # This may need to be cleaned up.  ssh need initialisation for deadline to work.
+  openssh_keypair:
+    path: "/etc/ssh/init_key"
+    mode: '0600'
+    # owner: deployuser
+  # delegate_to: "{{ delegate_host }}"
+  # become: true
+
+- name: Check registration of hostname and register service with consul
+  shell: |
+    hostnamectl
+    consul services register -name=deadlinedb
+    sleep 5
+    consul catalog services
+    dig deadlinedb.service.consul
+    if [[ $(dig +short deadlinedb.service.consul) -eq 0 ]]; then echo "No DNS entry found for deadlinedb.service.consul"; exit 1; fi
+  become: true
+  # args:
+  #   executable: /bin/bash
+
+- local_action: shell dig +short deadlinedb.service.consul
+  changed_when: false
+  register: dig_output
+
+- set_fact:
+    looked_up_ips: "{{ dig_output.stdout_lines }}"
+
+- debug: msg="found ip {{ item }}"
+  with_items: looked_up_ips
+
+# See an example SSL workflow here https://stackoverflow.com/questions/35790287/self-signed-ssl-connection-using-pymongo#35967188
+
+# - name: legacy- generate self signed certs on the host.
+#   shell: |
+#     # from https://stackoverflow.com/questions/35790287/self-signed-ssl-connection-using-pymongo#35967188
+
+#     #ensure rand file exists
+#     cd ~/; openssl rand -writerand .rnd
+
+#     mkdir -p /etc/ssl
+#     cd /etc/ssl
+
+#     # create private key and self sign it.
+#     openssl genrsa -out privkey.pem 2048
+#     openssl req -new -key privkey.pem -out certreq.csr -subj "/O=Deadline10Installer/CN=root"
+#     openssl x509 -req -in certreq.csr -signkey privkey.pem -out ca.pem
+
+#     # sign a key for the server
+#     hostname=$(hostname)  # note down the value
+#     echo "00" > file.srl # two random digits number
+#     openssl genrsa -out server.key 2048
+#     openssl req -key server.key -new -out server.req -subj  "/O=Deadline10Installer/OU=Deadline10Server/CN=server1/CN=$hostname"
+#     openssl x509 -req -in server.req -CA ca.pem -CAkey privkey.pem -CAserial file.srl -out server.crt -days 3650
+#     cat server.key server.crt > server.pem
+#     openssl verify -CAfile ca.pem server.pem
+
+#     # create a client key
+#     client_hostname=$(hostname) # since we are running the deadline RCS on the same host, we use the same host name
+#     openssl genrsa -out client.key 2048
+#     openssl req -key client.key -new -out client.req -subj "/CN=Deadline10Client/O=Deadline10Installer/OU=Deadline10Client/keyUsage=digitalSignature/extendedKeyUsage=clientAuth/"
+#     openssl x509 -req -in client.req -CA ca.pem -CAkey privkey.pem -CAserial file.srl -out client.crt -days 3650
+#     cat client.key client.crt > client.pem
+#     openssl verify -CAfile ca.pem client.pem
+#     echo "The below value of the subject for the certificate must be added as a user"
+#     openssl x509 -in client.pem -inform PEM -subject -nameopt RFC2253
+
+#     # the server can use these keys
+#     # mongod --sslMode requireSSL --sslPEMKeyFile ~/server.pem --sslCAFile ~/ca.pem
+
+#     # and client connect with
+#     # mongo --ssl --sslPEMKeyFile ~/client.pem --sslCAFile ~/ca.pem --host <server hostname>
+#   become: true
+#   args:
+#     executable: /bin/bash
+
+# - name: generate certs with vault for mongo db server
+#   shell: |
+#     export VAULT_ADDR=https://vault.service.consul:8200
+#     vault login -method=aws header_value=vault.service.consul role=provisioner-vault-role  
+#     vault write -format=json pki_int/issue/firehawkvfx-dot-com \
+#     common_name=deadlinedb.service.consul \
+#     ttl=8760h | tee \
+#     >(jq -r .data.certificate > /etc/ssl/mongodb_ca.pem) \
+#     >(jq -r .data.issuing_ca > /etc/ssl/mongodb_issuing_ca.pem) \
+#     >(jq -r .data.private_key > /etc/ssl/mongodb_ca_key.pem)
+#     cat /etc/ssl/mongodb_ca_key.pem /etc/ssl/mongodb_ca.pem > /etc/ssl/mongodb_consolidated_certs.pem
+#   become: true
+#   args:
+#     executable: /bin/bash
+
+# - name: generate certs with vault for mongo db client
+#   shell: |
+#     export VAULT_ADDR=https://vault.service.consul:8200
+#     vault login -method=aws header_value=vault.service.consul role=provisioner-vault-role  
+#     vault write -format=json pki_int/issue/firehawkvfx-dot-com \
+#     common_name=deadlinedb.service.consul \
+#     ttl=8760h | tee \
+#     >(jq -r .data.certificate > /etc/ssl/mongodbclient_ca.pem) \
+#     >(jq -r .data.issuing_ca > /etc/ssl/mongodbclient_issuing_ca.pem) \
+#     >(jq -r .data.private_key > /etc/ssl/mongodbclient_ca_key.pem)
+#     cat /etc/ssl/mongodbclient_ca.pem /etc/ssl/mongodbclient_ca_key.pem > /etc/ssl/mongodbclient_consolidated_certs.pem
+#   become: true
+#   args:
+#     executable: /bin/bash
+
+# - name: generate certs with vault for mongo db remote client
+#   shell: |
+#     export VAULT_ADDR=https://vault.service.consul:8200
+#     vault login -method=aws header_value=vault.service.consul role=provisioner-vault-role  
+#     vault write -format=json pki_int/issue/firehawkvfx-dot-com \
+#     common_name=deadlinedb.service.consul \
+#     ttl=8760h | tee \
+#     >(jq -r .data.certificate > /etc/ssl/mongodbremoteclient_ca.pem) \
+#     >(jq -r .data.issuing_ca > /etc/ssl/mongodbremoteclient_issuing_ca.pem) \
+#     >(jq -r .data.private_key > /etc/ssl/mongodbremoteclient_ca_key.pem)
+#     cat /etc/ssl/mongodbremoteclient_ca.pem /etc/ssl/mongodbremoteclient_ca_key.pem > /etc/ssl/mongodbremoteclient_consolidated_certs.pem
+#   become: true
+#   args:
+#     executable: /bin/bash
+
+- name: download sources
+  get_url:
+    url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
+    dest: "/tmp/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
+
+# - name: Create mongo app dir
+#   file: 
+#     path: /opt/Thinkbox/DeadlineDatabase10/mongo/application
+#     state: directory
+#   become: true
+
+# - name: Create mongo data dir
+#   file: 
+#     path: /opt/Thinkbox/DeadlineDatabase10/mongo/data
+#     state: directory
+#   become: true
+
+# - name: Extract
+#   unarchive:
+#     src: "/tmp/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
+#     dest: "/opt/Thinkbox/DeadlineDatabase10/mongo/application"
+#     extra_opts:
+#     - --strip-components=1 
+#     remote_src: true
+#   become: true
+
+# - name: Create mongo log dir
+#   file: 
+#     path: /opt/Thinkbox/DeadlineDatabase10/mongo/data/logs
+#     state: directory
+#   become: true
+
+# - name: mongodb service config file
+#   copy: 
+#     src: "config.conf"
+#     dest: "/opt/Thinkbox/DeadlineDatabase10/mongo/data/"
+#     mode: '0755'
+#   become: true
+
+# - name: deadline_mongo wrapper executable helper
+#   copy: 
+#     src: "deadline_mongo"
+#     dest: "/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin"
+#     mode: '0755'
+#   become: true
+
+# - name: mongodb service
+#   copy: 
+#     src: "Deadline10db"
+#     dest: "/etc/init.d/"
+#     mode: '0755'
+#   become: true
+
+# - name: Init admin, test, and x509 user # https://docs.mongodb.com/manual/tutorial/enable-authentication/
+#   shell: |
+    
+#     cd /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin
+#     ls -ltriah
+#     ./mongod --port 27017 --dbpath /opt/Thinkbox/DeadlineDatabase10/mongo/data
+#     # ./mongo --port 27017 --authenticationDatabase admin --eval '
+#     #   db.createUser(
+#     #     {
+#     #       user: "myUserAdmin",
+#     #       pwd: "passwordfromvault",
+#     #       roles: [ { role: "userAdminAnyDatabase", db: "admin" }, "readWriteAnyDatabase" ]
+#     #     }
+#     #   );
+#     #   db.adminCommand( { shutdown: 1 } );
+#     # '
+
+#     ./mongo --port 27017 --authenticationDatabase admin --eval '
+#       db.createUser(
+#         {
+#           user: "myUserAdmin",
+#           pwd: "passwordfromvault",
+#           roles: [
+#             { role: "userAdminAnyDatabase", db: "admin" },
+#             { role: "dbAdminAnyDatabase", db: "admin" },
+#             { role: "readWriteAnyDatabase", db: "admin" }
+#           ]
+#         }
+#       );
+#     '
+
+#     ./mongo --port 27017 --authenticationDatabase "admin" -u "myUserAdmin" -p "passwordfromvault" --eval '
+#       db.adminCommand( { shutdown: 1 } );
+#     '
+
+
+#     ./mongod --auth --port 27017 --dbpath /opt/Thinkbox/DeadlineDatabase10/mongo/data
+#     ./mongo --port 27017  --authenticationDatabase "admin" -u "myUserAdmin" -p "passwordfromvault" --eval '
+#       use test
+#       db.createUser(
+#         {
+#           user: "myTester",
+#           pwd:  "passwordfromvault",   // or cleartext password
+#           roles: [ { role: "readWrite", db: "test" },
+#                   { role: "read", db: "reporting" } ]
+#         }
+#       )
+
+
+#     ./mongo --port 27017  --authenticationDatabase "admin" -u "myUserAdmin" -p "passwordfromvault" --eval '
+#       use admin;
+#       db.getSiblingDB("$external").runCommand(
+#         {
+#           createUser: "CN=Deadline10Client,O=Deadline10Installer,OU=Deadline10Client,keyUsage=digitalSignature,extendedKeyUsage=clientAuth",
+#           roles: [
+#               { role: "readWrite", db: "test" },
+#               { role: "userAdminAnyDatabase", db: "admin" },
+#               "readWriteAnyDatabase"
+#           ],
+#           writeConcern: { w: "majority" , wtimeout: 5000 }
+#         }
+#       );
+#       db.adminCommand( { shutdown: 1 } );
+#     '
+#   become: true
+#   args:
+#     executable: /bin/bash
+
+# - name: Start service mongodb Deadline10db
+#   service:
+#     name: Deadline10db
+#     state: started
+#     daemon_reload: true
+#     enabled: true
+#   become: true

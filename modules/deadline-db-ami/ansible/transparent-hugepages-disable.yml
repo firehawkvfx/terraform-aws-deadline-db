@@ -1,0 +1,36 @@
+---
+- hosts: "{{ variable_host | default('localhost') }}"
+  remote_user: "{{ variable_connect_as_user | default('root') }}"
+  gather_facts: "{{ variable_gather_facts | default('false') }}"
+  become: true
+  any_errors_fatal: true
+
+  pre_tasks:
+  - name: Service file # This is a service to ensure transparent huge pages is always disabled.
+    copy:
+      dest: "/etc/systemd/system/disable-transparent-huge-pages.service"
+      mode: '0644'
+      content: |
+        [Unit]
+        Description=Disable Transparent Huge Pages (THP)
+        DefaultDependencies=no
+        After=sysinit.target local-fs.target
+        Before=mongod.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/enabled > /dev/null'
+        ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/defrag > /dev/null'
+
+        [Install]
+        WantedBy=basic.target
+
+  - name: start the service
+    systemd:
+      state: started
+      daemon_reload: yes
+      enabled: yes
+      name: disable-transparent-huge-pages
+
+  roles:
+  - role: transparent-hugepages-check

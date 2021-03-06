@@ -1,0 +1,22 @@
+---
+# tasks file for diskspace-check
+
+- name: Collect some facts for disk mounts
+  setup:
+    gather_subset:
+      - '!all'
+      - 'hardware'
+  tags:
+  - always
+
+# - debug:
+#     var: item
+#   with_items: "{{ ansible_mounts }}"
+
+- name: "Ensure that free space on {{ mountname }} is greater than 20% and at least 8GB"
+  assert:
+    that: ( item.size_available > item.size_total|float * 0.2 ) and ( item.size_available > 8000000000 )
+    msg: 'disk space has reached 80% threshold'
+  when: item.mount == mountname
+  ignore_errors: "{{ ignore_errors }}"
+  with_items: "{{ ansible_mounts }}"

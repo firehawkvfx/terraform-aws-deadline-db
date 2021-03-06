@@ -1,0 +1,35 @@
+# from https://stackoverflow.com/questions/35790287/self-signed-ssl-connection-using-pymongo#35967188
+
+#ensure rand file exists
+cd ~/; openssl rand -writerand .rnd
+
+mkdir -p ~/ssl
+cd ~/ssl
+
+# create private key and self sign it.
+openssl genrsa -out privkey.pem 2048
+openssl req -new -key privkey.pem -out certreq.csr -subj "/O=Organisation/CN=root"
+openssl x509 -req -in certreq.csr -signkey privkey.pem -out ca.pem
+
+# sign a key for the server
+hostname=$(hostname)  # note down the value
+echo "00" > file.srl # two random digits number
+openssl genrsa -out server.key 2048
+openssl req -key server.key -new -out server.req -subj  "/O=Deadline10Installer/CN=server1/CN=$hostname"
+openssl x509 -req -in server.req -CA ca.pem -CAkey privkey.pem -CAserial file.srl -out server.crt -days 3650
+cat server.key server.crt > server.pem
+openssl verify -CAfile ca.pem server.pem
+
+# create a client key
+client_hostname=$(hostname) # since we are running the deadline RCS on the same host, we use the same host name
+openssl genrsa -out client.key 2048
+openssl req -key client.key -new -out client.req -subj "/CN=Deadline10Client/O=Deadline10Installer/OU=Deadline10Client"
+openssl x509 -req -in client.req -CA ca.pem -CAkey privkey.pem -CAserial file.srl -out client.crt -days 3650
+cat client.key client.crt > client.pem
+openssl verify -CAfile ca.pem client.pem
+
+# the server can use these keys
+# mongod --sslMode requireSSL --sslPEMKeyFile ~/server.pem --sslCAFile ~/ca.pem
+
+# and client connect with
+# mongo --ssl --sslPEMKeyFile ~/client.pem --sslCAFile ~/ca.pem --host <server hostname>

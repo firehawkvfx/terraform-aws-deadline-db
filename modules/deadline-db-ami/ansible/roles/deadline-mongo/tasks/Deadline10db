@@ -1,0 +1,214 @@
+#!/bin/bash
+#
+# mongodb Startup script for Mongo DB
+#
+# chkconfig: - 20 80
+# description: MongoDB (from "humongous") is a scalable, high-performance, open$
+
+### BEGIN INIT INFO
+# Provides: Deadline10db
+# Default-Start: 2 3 5
+# Default-Stop:  0 1 4 6
+# Required-Start: $network $local_fs $remote_fs
+# Required-Stop: $network $local_fs $remote_fs
+# Short-Description: Mongo DB NoSQL Database.
+# Description: MongoDB (from "humongous") is a scalable, high-performance, open$
+### END INIT INFO
+
+# Source function library. (Supported only on Red Hat distributions.
+( . /etc/rc.d/init.d/functions > /dev/null 2>&1 )
+
+DEADLINEVERSION=10
+MONGODBBIN=/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin
+MONGODBDATA=/opt/Thinkbox/DeadlineDatabase10/mongo/data
+MONGOSERVICEFILENAME="mongodb"
+MONGOLOCK="/var/lock/subsys/deadline$DEADLINEVERSION$MONGOSERVICEFILENAME"
+LOGFILE="/var/log/deadline$DEADLINEVERSION$MONGOSERVICEFILENAME.log"
+PIDFILE="/var/run/deadline$DEADLINEVERSION$MONGOSERVICEFILENAME.pid"
+RUNNING=0 # Is the process in our PID file running?
+PID=-1    # What is the process ID?
+ULIMITSETTING=200000 # Open file descriptor limit (200000 is the recommended amount)
+
+LONGNAME="MongoDB Service For Deadline ${DEADLINEVERSION}"
+
+service_is_running() {
+        # Note that this only checks to see if there's a process running
+        # that was started from this init script.
+        if [ -e "${PIDFILE}" ]; then
+                PID=`cat ${PIDFILE}`
+                ps -p $PID >/dev/null 2>&1
+                if [ $? -eq 0 ]; then
+                        return 0
+                else
+                        rm -f "${PIDFILE}" >/dev/null 2>&1
+                        rm -f "${MONGOLOCK}" >/dev/null 2>&1
+                fi
+        fi
+
+        PID=-1
+        return 1
+}
+
+log_event() {
+        if [ $# -gt 0 ]; then
+                date "+%F %T: $1" >> "${LOGFILE}"
+
+                if [ $# -gt 1 ] && [ $2 = true ]; then
+                        echo $1
+                fi
+        fi
+}
+
+start () {
+        if service_is_running; then
+                log_event "The ${LONGNAME} is already running (PID ${PID})." true
+
+                return 0
+        else
+                # Start the service
+                if [ -e "${MONGODBBIN}/mongod" ]; then
+                        if [ -x "${MONGODBBIN}/mongod" ]; then
+                                # Increase file descriptors limit
+                                if [ "$(ulimit -n)" -lt "$ULIMITSETTING" ]; then
+                                        ulimit -n "$ULIMITSETTING"
+                                fi
+
+                                # Start the service
+                                ("$MONGODBBIN/mongod" --config "$MONGODBDATA/config.conf") &
+
+                                # Log the PID and create the LOCK file
+                                echo $! > "${PIDFILE}"
+                                touch "${MONGOLOCK}" 2> /dev/null
+
+                                if service_is_running; then
+                                        log_event "The ${LONGNAME} has been started." true
+                                        log_event "Full log can be found in ${MONGODBDATA}/logs/log.txt"
+
+                                        return 0
+                                else
+                                        log_event "The ${LONGNAME} failed to start." true
+                                        return 7
+                                fi
+                        else
+                                log_event "'${MONGODBBIN}/mongod' is lacking execute permissions for the current user." true
+                                return 4
+                        fi
+                else
+                        log_event "'mongod' was not found at the expected location (${MONGODBBIN})" true
+                        return 5
+                fi
+        fi
+}
+
+stop () {
+        if ! service_is_running; then
+                log_event "The ${LONGNAME} is not currently running." true
+                return 0
+        else
+                log_event "Shutting down the ${LONGNAME}..." true
+                kill -QUIT $PID
+
+                COUNTER=0
+                while kill -0 $PID >/dev/null 2>&1; do
+                        COUNTER=$((COUNTER+1))
+
+                        if [ "$COUNTER" -gt 10 ]; then
+                                break
+                        fi
+
+                        sleep 0.5
+                done
+
+                if service_is_running; then
+                        # Time to bring out the big guns
+                        kill -KILL $PID
+
+                        sleep 0.5
+
+                        if service_is_running; then
+                                log_event "Failed to stop the ${LONGNAME}." true
+                                return 1
+                        fi
+                fi
+        fi
+
+        log_event "The ${LONGNAME} has been stopped gracefully." true
+
+        return 0
+}
+
+restart() {
+        stop
+        start
+
+        return $?
+}
+
+rh_status(){
+        if [ -e "${PIDFILE}" ]; then
+                PID=`cat ${PIDFILE}`
+
+                if ps -p $PID >/dev/null 2>&1; then
+                        log_event "The ${LONGNAME} is running with PID $PID." true
+                        return 0
+                else
+                        log_event "The ${LONGNAME} exited prematurely." true
+                        return 1
+                fi
+        elif [ -e "${MONGOLOCK}" ]; then
+                log_event "The ${LONGNAME} exited prematurely." true
+                return 2
+        else
+                log_event "The ${LONGNAME} is not currently running." true
+                return 3
+        fi
+}
+
+rh_status_q(){
+        rh_status >/dev/null 2>&1
+
+        return $?
+}
+log_event "'$1' invoked..."
+
+EXIT_CODE=1
+# See how we were called.
+case "$1" in
+        start)
+                start
+
+                EXIT_CODE=$?
+                ;;
+        stop)
+                stop
+
+                EXIT_CODE=$?
+                ;;
+        restart|force-reload)
+                restart
+
+                EXIT_CODE=$?
+                ;;
+        status)
+                rh_status
+
+                EXIT_CODE=$?
+                ;;
+        condrestart|try-restart)
+                if ! rh_status_q; then
+                        log_event "The ${LONGNAME} is not currently running; restart will not be performed." true
+
+                        EXIT_CODE=0
+                else
+                        restart
+
+                        EXIT_CODE=$?
+                fi
+                ;;
+        *)
+                log_event "Usage: $0 {start|stop|status|restart|condrestart|try-restart|force-reload}" true
+                EXIT_CODE=3
+esac
+
+log_event "'$1' operation finished with exit code '$EXIT_CODE'."
+exit $EXIT_CODE
