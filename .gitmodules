@@ -1,3 +1,0 @@
-[submodule "modules/deadline-db-ami/ansible/collections/ansible_collections/firehawkvfx/ansible_collection_fsx"]
-	path = modules/deadline-db-ami/ansible/collections/ansible_collections/firehawkvfx/ansible_collection_fsx
-	url = git@github.com:firehawkvfx/ansible_collection_fsx.git
