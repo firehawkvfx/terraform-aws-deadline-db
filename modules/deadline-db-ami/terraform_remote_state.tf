@@ -12,6 +12,14 @@ variable "vpcname_vault" {
     type = string
 }
 data "aws_region" "current" {}
+data "terraform_remote_state" "vault_vpc" { # read the arn with data.terraform_remote_state.provisioner_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.provisioner_profile.outputs.instance_profile_name
+  backend = "s3"
+  config = {
+    bucket = "state.terraform.${var.bucket_extension_vault}"
+    key    = "${var.resourcetier_vault}/vaultvpc/terraform.tfstate"
+    region = data.aws_region.current.name
+  }
+}
 data "terraform_remote_state" "provisioner_profile" { # read the arn with data.terraform_remote_state.provisioner_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.provisioner_profile.outputs.instance_profile_name
   backend = "s3"
   config = {
@@ -20,6 +28,17 @@ data "terraform_remote_state" "provisioner_profile" { # read the arn with data.t
     region = data.aws_region.current.name
   }
 }
+output "vpc_id" {
+    value = data.terraform_remote_state.vault_vpc.outputs.vpc_id
+}
+output "public_subnets" {
+    value = data.terraform_remote_state.vault_vpc.outputs.public_subnets
+}
+
+output "consul_client_security_group" {
+    value = data.terraform_remote_state.vault_vpc.outputs.consul_client_security_group
+}
+
 output "instance_profile_name" {
     value = data.terraform_remote_state.provisioner_profile.outputs.instance_profile_name
 }

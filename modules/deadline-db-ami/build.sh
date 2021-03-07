@@ -19,12 +19,19 @@ fi
 export PACKER_LOG=1
 export PACKER_LOG_PATH="$SCRIPTDIR/packerlog.log"
 
-export PKR_VAR_vpc_id="$(cd ../vpc; terraform output -json "vpc_id" | jq -r '.')"
+terraform init \
+    -input=false
+terraform plan -out=tfplan -input=false
+terraform apply -input=false tfplan
+
+export PKR_VAR_vpc_id="$(terraform output -json "vpc_id" | jq -r '.')"
 echo "Using VPC: $PKR_VAR_vpc_id"
-export PKR_VAR_subnet_id="$(cd ../vpc; terraform output -json "public_subnets" | jq -r '.[0]')"
+export PKR_VAR_subnet_id="$(terraform output -json "public_subnets" | jq -r '.[0]')"
 echo "Using Subnet: $PKR_VAR_subnet_id"
-export PKR_VAR_security_group_id="$(cd ../vpc; terraform output -json "consul_client_security_group" | jq -r '.')"
+export PKR_VAR_security_group_id="$(terraform output -json "consul_client_security_group" | jq -r '.')"
 echo "Using Security Group: $PKR_VAR_security_group_id"
+export PKR_VAR_provisioner_iam_profile_name="$(terraform output instance_profile_name)"
+echo "Using profile: $PKR_VAR_provisioner_iam_profile_name"
 
 export PKR_VAR_manifest_path="$SCRIPTDIR/manifest.json"
 
