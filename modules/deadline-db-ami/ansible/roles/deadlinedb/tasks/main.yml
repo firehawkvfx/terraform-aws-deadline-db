@@ -99,8 +99,12 @@
     if [[ -f {{ deadline_linux_installers_tar }} ]]; then
       echo "File already exists"
     else
-      aws s3api get-object --bucket thinkbox-installers --key Deadline/{{ deadline_version }}/Linux/{{ deadline_linux_installers_tar | basename }} {{ deadline_linux_installers_tar }}
+      {{ aws_executable }} s3api get-object --bucket thinkbox-installers --key Deadline/{{ deadline_version }}/Linux/{{ deadline_linux_installers_tar | basename }} {{ deadline_linux_installers_tar }}
     fi
+  vars:
+    aws_executable: "~/.local/bin/aws"
+  args:
+    executable: /bin/bash
   tags:
   - install
   - sync_installers
