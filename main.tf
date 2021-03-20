@@ -91,10 +91,10 @@ locals {
   # public_route_table_ids     = data.aws_route_tables.public.ids
   # public_domain_name         = "none"
 }
-module "vault_client" {
-  source              = "./modules/vault-client"
-  name                = "vaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
-  vault_client_ami_id = var.vault_client_ami_id
+module "deadline_db_vault_client" {
+  source              = "./modules/deadline-db-vault-client"
+  name                = "deadlinedbvaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
+  deadline_db_ami_id = var.deadline_db_ami_id
 
   consul_cluster_name    = var.consul_cluster_name
   consul_cluster_tag_key = var.consul_cluster_tag_key
