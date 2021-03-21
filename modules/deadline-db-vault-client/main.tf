@@ -1,4 +1,6 @@
 # A vault client host with consul registration and signed host keys from vault.
+
+data "aws_region" "current" {}
 resource "aws_security_group" "deadline_db_vault_client" {
   count       = var.create_vpc ? 1 : 0
   name        = var.name
@@ -73,15 +75,15 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
 }
 
 resource "aws_instance" "deadline_db_vault_client" {
-  count                     = var.create_vpc ? 1 : 0
-  ami                       = var.deadline_db_ami_id
-  instance_type             = var.instance_type
-  key_name                  = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.
-  subnet_id                 = tolist(var.private_subnet_ids)[0]
-  tags                      = merge(map("Name", var.name), var.common_tags, local.extra_tags)
-  user_data                 = data.template_file.user_data_auth_client.rendered
-  iam_instance_profile_name = data.terraform_remote_state.deadline_db_profile.outputs.instance_profile_name
-  vpc_security_group_ids    = local.vpc_security_group_ids
+  count                  = var.create_vpc ? 1 : 0
+  ami                    = var.deadline_db_ami_id
+  instance_type          = var.instance_type
+  key_name               = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.
+  subnet_id              = tolist(var.private_subnet_ids)[0]
+  tags                   = merge(map("Name", var.name), var.common_tags, local.extra_tags)
+  user_data              = data.template_file.user_data_auth_client.rendered
+  iam_instance_profile   = data.terraform_remote_state.deadline_db_profile.outputs.instance_profile_name
+  vpc_security_group_ids = local.vpc_security_group_ids
   root_block_device {
     delete_on_termination = true
   }
