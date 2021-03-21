@@ -16,3 +16,5 @@ dependencies {
     "../../../firehawk-main/modules/terraform-aws-iam-profile-deadline-db"
     ]
 }
+
+skip = true
