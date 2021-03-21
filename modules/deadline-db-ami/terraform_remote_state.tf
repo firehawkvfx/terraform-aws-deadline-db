@@ -16,7 +16,7 @@ data "terraform_remote_state" "vault_vpc" { # read the arn with data.terraform_r
   backend = "s3"
   config = {
     bucket = "state.terraform.${var.bucket_extension_vault}"
-    key    = "${var.resourcetier_vault}/vaultvpc/terraform.tfstate"
+    key    = "firehawk-main/modules/vpc/terraform.tfstate"
     region = data.aws_region.current.name
   }
 }
@@ -24,7 +24,7 @@ data "terraform_remote_state" "provisioner_profile" { # read the arn with data.t
   backend = "s3"
   config = {
     bucket = "state.terraform.${var.bucket_extension_vault}"
-    key    = "${var.resourcetier_vault}/${var.vpcname_vault}-terraform-aws-iam-profile-provisioner/terraform.tfstate"
+    key    = "firehawk-main/modules/terraform-aws-iam-profile-provisioner/terraform.tfstate"
     region = data.aws_region.current.name
   }
 }

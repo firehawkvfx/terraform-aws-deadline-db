@@ -67,7 +67,7 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
   backend = "s3"
   config = {
     bucket = "state.terraform.${var.bucket_extension_vault}"
-    key    = "${var.resourcetier_vault}/${var.vpcname_vault}-terraform-aws-iam-profile-deadline-db/terraform.tfstate"
+    key    = "firehawk-main/modules/terraform-aws-iam-profile-deadline-db/terraform.tfstate"
     region = data.aws_region.current.name
   }
 }
