@@ -59,10 +59,10 @@ variable "consul_cluster_name" {
   type        = string
 }
 
-variable "bastion_public_dns" {
-  description = "The bastion must exist in order to provide complete instructions to establish connection with this host, and also aquire the security group enabling ssh between both hosts."
-  type        = string
-}
+# variable "bastion_public_dns" {
+#   description = "The bastion must exist in order to provide complete instructions to establish connection with this host, and also aquire the security group enabling ssh between both hosts."
+#   type        = string
+# }
 
 variable "onsite_public_ip" {
   description = "The public ip address of your onsite location to enable access to security groups and openVPN."
