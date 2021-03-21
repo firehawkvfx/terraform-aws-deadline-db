@@ -78,3 +78,7 @@ variable "aws_internal_domain" {
   description = "The domain used to resolve internal FQDN hostnames."
   type        = string
 }
+variable "bucket_extension_vault" {
+    description = "The bucket extension where the terraform remote state resides"
+    type = string
+}
