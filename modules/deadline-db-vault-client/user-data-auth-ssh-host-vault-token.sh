@@ -23,7 +23,7 @@ if $(has_yum); then
     hostname=$(hostname -s) # in centos, failed dns lookup can cause commands to slowdown
     echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
     hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
-    systemctl restart network
+    # systemctl restart network # we restart the network later, needed to update the host name
 fi
 
 log "hostname: $(hostname)"
@@ -162,8 +162,14 @@ grep -q "^TrustedUserCAKeys" /etc/ssh/sshd_config || echo 'TrustedUserCAKeys' | 
 sed -i "s@TrustedUserCAKeys.*@TrustedUserCAKeys $trusted_ca@g" /etc/ssh/sshd_config 
 systemctl daemon-reload
 
+# restart network
 systemctl restart sshd
-systemctl NetworkManager.service restart
+sleep 5 # Wait 5 seconds for the ssh settings to update, preventing unknown host warnings.
+if $(has_yum); then
+  systemctl restart network # Allow users to connect!
+else # assume ubuntu
+  systemctl restart systemd-networkd
+fi
 
 # # start network
 # systemctl start sshd
