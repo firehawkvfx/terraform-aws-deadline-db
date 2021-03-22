@@ -172,21 +172,13 @@ else # assume ubuntu
 fi
 
 # Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
-consul services register -name=deadlinedb
+service_name="deadlinedb"
+consul services register -name=$service_name
 sleep 5
 consul catalog services
-dig deadlinedb.service.consul
-result=$(dig +short deadlinedb.service.consul) && exit_status=0 || exit_status=$?
-if [[ ! $exit_status -eq 0 ]]; then echo "No DNS entry found for deadlinedb.service.consul"; exit 1; fi
-
-# # start network
-# systemctl start sshd
-# sleep 5 # Wait 5 seconds for the ssh settings to update, preventing unknown host warnings.
-# if $(has_yum); then
-#   systemctl start network # Allow users to connect!
-# else # assume ubuntu
-#   systemctl NetworkManager.service start
-# fi
+dig $service_name.service.consul
+result=$(dig +short $service_name.service.consul) && exit_status=0 || exit_status=$?
+if [[ ! $exit_status -eq 0 ]]; then echo "No DNS entry found for $service_name.service.consul"; exit 1; fi
 
 log "Signing SSH host key done. Revoking vault token..."
 vault token revoke -self
