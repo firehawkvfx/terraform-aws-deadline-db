@@ -61,16 +61,28 @@ function retry {
 
 # If vault cli is installed we can also perform these operations with vault cli
 # The necessary environment variables have to be set
-export VAULT_TOKEN=${vault_token}
+
 export VAULT_ADDR=https://vault.service.consul:8200
 
+# ### Vault Token auth method provided by Terraform
+# export VAULT_TOKEN=${vault_token}
+# # Retry and wait for the Vault Agent to write the token out to a file.  This could be
+# # because the Vault server is still booting and unsealing, or because run-consul
+# # running on the background didn't finish yet
+# retry \
+#   "vault login --no-print $VAULT_TOKEN" \
+#   "Waiting for Vault login"
+
+### Vault IAM auth method ###
+/opt/vault/bin/run-vault --agent --agent-auth-type iam --agent-auth-role "${example_role_name}"
 # Retry and wait for the Vault Agent to write the token out to a file.  This could be
 # because the Vault server is still booting and unsealing, or because run-consul
 # running on the background didn't finish yet
-
 retry \
-  "vault login --no-print $VAULT_TOKEN" \
-  "Waiting for Vault login"
+  "[[ -s /opt/vault/data/vault-token ]] && echo 'vault token file created'" \
+  "waiting for Vault agent to write out token to sink"
+# We can then use the client token from the login output once login was successful
+token=$(cat /opt/vault/data/vault-token)
 
 log "Aquiring vault data..."
 

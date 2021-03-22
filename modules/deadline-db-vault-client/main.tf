@@ -8,14 +8,14 @@ resource "aws_security_group" "deadline_db_vault_client" {
   description = "Vault client security group"
   tags        = merge(map("Name", var.name), var.common_tags, local.extra_tags)
 
-  # ingress {
-  #   protocol    = "-1"
-  #   from_port   = 0
-  #   to_port     = 0
-  #   cidr_blocks = var.permitted_cidr_list
+  ingress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = var.permitted_cidr_list_private
 
-  #   description = "all incoming traffic from vpc, vpn dhcp, and remote subnet"
-  # }
+    description = "all incoming traffic from vpc, vpn dhcp, and remote subnet"
+  }
 
   ingress {
     protocol        = "tcp"
@@ -62,6 +62,7 @@ data "template_file" "user_data_auth_client" {
     vault_token              = vault_token.ssh_host.client_token
     aws_internal_domain      = var.aws_internal_domain
     aws_external_domain      = "" # The external domain is not used for internal hosts.
+    example_role_name        = "deadline-db-vault-role"
   }
 }
 

@@ -39,9 +39,15 @@ variable "common_tags" {
   default     = {}
 }
 variable "permitted_cidr_list" {
-  description = "The list of remote CIDR blocks that will be able to access the host."
+  description = "The list of CIDR blocks, (including public CIDR's) that will be able to access the host."
   type        = list(string)
 }
+
+variable "permitted_cidr_list_private" {
+  description = "The list of private CIDR blocks that will be able to access the host."
+  type        = list(string)
+}
+
 variable "security_group_ids" {
   description = "The list of security group ID's that have SSH access to the node"
   type        = list(string)
