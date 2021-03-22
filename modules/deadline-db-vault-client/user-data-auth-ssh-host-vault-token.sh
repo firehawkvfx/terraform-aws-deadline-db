@@ -147,13 +147,13 @@ function ensure_known_hosts {
 ensure_known_hosts /etc/ssh/ssh_known_hosts
 # ensure_known_hosts /home/centos/.ssh/known_hosts
 
-# stop network while making changes to avoid early connection unrecognised host warnings
-systemctl stop sshd
-if $(has_yum); then
-  systemctl stop network # This can be used to avoid unknown host warnings caused by a race condition, at the expense of speed.
-else # assume ubuntu
-  sudo systemctl NetworkManager.service stop
-fi
+# # stop network while making changes to avoid early connection unrecognised host warnings
+# systemctl stop sshd
+# if $(has_yum); then
+#   systemctl stop network # This can be used to avoid unknown host warnings caused by a race condition, at the expense of speed.
+# else # assume ubuntu
+#   systemctl NetworkManager.service stop
+# fi
 
 ### Finally allow users with signed client certs to login.
 # If TrustedUserCAKeys not defined, then add it to sshd_config
@@ -162,14 +162,17 @@ grep -q "^TrustedUserCAKeys" /etc/ssh/sshd_config || echo 'TrustedUserCAKeys' | 
 sed -i "s@TrustedUserCAKeys.*@TrustedUserCAKeys $trusted_ca@g" /etc/ssh/sshd_config 
 systemctl daemon-reload
 
-# start network
-systemctl start sshd
-sleep 5 # Wait 5 seconds for the ssh settings to update, preventing unknown host warnings.
-if $(has_yum); then
-  systemctl start network # Allow users to connect!
-else # assume ubuntu
-  sudo systemctl NetworkManager.service start
-fi
+systemctl restart sshd
+systemctl NetworkManager.service restart
+
+# # start network
+# systemctl start sshd
+# sleep 5 # Wait 5 seconds for the ssh settings to update, preventing unknown host warnings.
+# if $(has_yum); then
+#   systemctl start network # Allow users to connect!
+# else # assume ubuntu
+#   systemctl NetworkManager.service start
+# fi
 
 log "Signing SSH host key done. Revoking vault token..."
 vault token revoke -self
