@@ -95,12 +95,13 @@ locals {
   private_domain             = lookup(data.vault_generic_secret.private_domain.data, "value")
   onsite_public_ip           = var.onsite_public_ip
   private_route_table_ids    = data.aws_route_tables.private.ids
+  instance_name              = "${lookup(local.common_tags, "vpcname", "default")}_deadlinedbvaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
   # public_route_table_ids     = data.aws_route_tables.public.ids
   # public_domain_name         = "none"
 }
 module "deadline_db_vault_client" {
   source                      = "./modules/deadline-db-vault-client"
-  name                        = "${lookup(local.common_tags, "vpcname", "default")}_deadlinedbvaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
+  name                        = local.instance_name
   deadline_db_ami_id          = var.deadline_db_ami_id
   consul_cluster_name         = var.consul_cluster_name
   consul_cluster_tag_key      = var.consul_cluster_tag_key
