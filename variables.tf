@@ -28,12 +28,6 @@ variable "pipelineid" {
   type        = string
 }
 
-# variable "route_public_domain_name" {
-#   description = "Defines if a public DNS name is to be used"
-#   type        = bool
-#   default     = false
-# }
-
 variable "remote_cloud_public_ip_cidr" {
   description = "The remote cloud IP public address that will access the vault client (cloud 9)"
   type        = string
@@ -58,11 +52,6 @@ variable "consul_cluster_name" {
   description = "What to name the Consul server cluster and all of its associated resources"
   type        = string
 }
-
-# variable "bastion_public_dns" {
-#   description = "The bastion must exist in order to provide complete instructions to establish connection with this host, and also aquire the security group enabling ssh between both hosts."
-#   type        = string
-# }
 
 variable "onsite_public_ip" {
   description = "The public ip address of your onsite location to enable access to security groups and openVPN."
