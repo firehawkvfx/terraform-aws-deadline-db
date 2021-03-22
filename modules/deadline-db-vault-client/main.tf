@@ -56,21 +56,22 @@ resource "aws_security_group" "deadline_db_vault_client" {
     description = "all outgoing traffic"
   }
 }
-resource "vault_token" "ssh_host" { # dynamically generate a token with constrained permisions for the host role.
-  role_name        = "host-vault-token-creds-role"
-  policies         = ["ssh_host"]
-  renewable        = false
-  explicit_max_ttl = "120s"
-}
+# resource "vault_token" "ssh_host" { # dynamically generate a token with constrained permisions for the host role.
+#   role_name        = "host-vault-token-creds-role"
+#   policies         = ["ssh_host"]
+#   renewable        = false
+#   explicit_max_ttl = "120s"
+# }
 data "template_file" "user_data_auth_client" {
   template = file("${path.module}/user-data-auth-ssh-host-vault-token.sh")
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
     consul_cluster_tag_value = var.consul_cluster_name
-    vault_token              = vault_token.ssh_host.client_token
     aws_internal_domain      = var.aws_internal_domain
     aws_external_domain      = "" # The external domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
+    vault_token              = ""
+    # vault_token              = vault_token.ssh_host.client_token
   }
 }
 
