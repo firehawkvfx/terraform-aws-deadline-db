@@ -76,7 +76,7 @@ module "deadline_db_vault_client" {
   consul_cluster_tag_key      = var.consul_cluster_tag_key
   aws_internal_domain         = var.aws_internal_domain
   vpc_id                      = local.vpc_id
-  vpc_cidr                    = local.vpc_cidr_rendervpc
+  # vpc_cidr                    = local.vpc_cidr_rendervpc
   bucket_extension_vault      = var.bucket_extension_vault
   private_subnet_ids          = local.private_subnet_ids
   permitted_cidr_list         = ["${local.onsite_public_ip}/32", var.remote_cloud_public_ip_cidr, var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr, local.vpc_cidr_rendervpc, local.vpc_cidr_vaultvpc]
