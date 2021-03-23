@@ -13,6 +13,10 @@ data "aws_vpc" "rendervpc" {
   default = false
   tags    = var.common_tags_rendervpc
 }
+data "aws_vpc" "vaultvpc" {
+  default = false
+  tags    = var.common_tags_vaultvpc
+}
 data "aws_subnet_ids" "public" {
   vpc_id = data.aws_vpc.rendervpc.id
   tags   = map("area", "public")
