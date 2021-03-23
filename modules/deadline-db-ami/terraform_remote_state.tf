@@ -7,7 +7,7 @@ variable "resourcetier_vault" {
     description = "The resourcetier the desired vault vpc resides in"
     type = string
 }
-variable "vpcname_vault" {
+variable "vpcname_vaultvpc" {
     description = "A namespace component defining the location of the terraform remote state"
     type = string
 }

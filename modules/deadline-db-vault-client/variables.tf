@@ -17,10 +17,6 @@ variable "vpc_id" {
   type        = string
   default     = null
 }
-variable "vpc_cidr" {
-  description = "The CIDR block that contains all subnets within the VPC."
-  type        = string
-}
 
 # variable "vpn_cidr" {
 #   description = "The CIDR range that the vpn will assign using DHCP.  These are virtual addresses for routing traffic."
