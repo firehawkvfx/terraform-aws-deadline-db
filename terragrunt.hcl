@@ -14,7 +14,8 @@ dependencies {
     "../../../firehawk-main/modules/terraform-aws-sg-bastion",
     "../../../firehawk-main/modules/vault",
     "../../../firehawk-main/modules/vault-configuration",
-    "../../../firehawk-main/modules/terraform-aws-iam-profile-deadline-db"
+    "../../../firehawk-main/modules/terraform-aws-iam-profile-deadline-db",
+    "../terraform-aws-sg-vpn"
     ]
 }
 
