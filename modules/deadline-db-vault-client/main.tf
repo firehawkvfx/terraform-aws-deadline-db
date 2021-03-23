@@ -55,7 +55,7 @@ resource "aws_security_group" "deadline_db_vault_client" {
   }
 }
 data "template_file" "user_data_auth_client" {
-  template = file("${path.module}/user-data-auth-ssh-host-vault-token.sh")
+  template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
     consul_cluster_tag_value = var.consul_cluster_name
