@@ -1,1 +1,4 @@
 .DS_Store
+.terraform/
+s3-backend.tf
+tfplan
