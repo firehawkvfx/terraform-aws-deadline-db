@@ -32,12 +32,12 @@ resource "aws_security_group" "deadline_db_vault_client" {
     description     = "Vault Web UI Forwarding"
   }
   ingress {
-    protocol        = "tcp"
-    from_port       = 8080
-    to_port         = 8080
-    cidr_blocks     = var.permitted_cidr_list
+    protocol    = "tcp"
+    from_port   = 8080
+    to_port     = 8080
+    cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
-    description     = "Vault Web UI Forwarding"
+    description = "Vault Web UI Forwarding"
   }
   ingress {
     protocol    = "icmp"
@@ -59,8 +59,8 @@ resource "aws_security_group" "deadline_db_vault_client" {
 data "template_file" "user_data_auth_client" {
   # template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
   # Combine multiple template files.
-  template = format("%s%s%s", 
-    file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"), 
+  template = format("%s%s%s",
+    file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
     file("${path.module}/user-data-install-deadline-db.sh"),
     file("${path.module}/user-data-revoke-token.sh")
   )
@@ -71,7 +71,9 @@ data "template_file" "user_data_auth_client" {
     aws_internal_domain      = var.aws_internal_domain
     aws_external_domain      = "" # External domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
-    vault_token              = ""
+
+    deadline_installer_script_repo   = "https://github.com/firehawkvfx/packer-firehawk-amis.git"
+    deadline_installer_script_branch = "v0.0.4"
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name

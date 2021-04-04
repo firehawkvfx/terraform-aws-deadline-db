@@ -11,7 +11,7 @@ log "hostname: $(hostname)"
 log "hostname: $(hostname -f) $(hostname -s)"
 
 # Install Deadline DB and RCS with certificates
-sudo -u ubuntu git clone --branch v0.0.3 https://github.com/firehawkvfx/packer-firehawk-amis.git /home/ubuntu/packer-firehawk-amis
+sudo -u ubuntu git clone --branch ${deadline_installer_script_branch} ${deadline_installer_script_repo} /home/ubuntu/packer-firehawk-amis
 sudo -u ubuntu /home/ubuntu/packer-firehawk-amis/modules/firehawk-ami/scripts/deadlinedb_install_with_certs.sh
 
 # Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
