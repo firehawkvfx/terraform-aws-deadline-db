@@ -18,6 +18,43 @@ log "hostname: $(hostname -f) $(hostname -s)"
 sudo -u ubuntu git clone --branch ${deadline_installer_script_branch} ${deadline_installer_script_repo} /home/ubuntu/packer-firehawk-amis
 sudo -u ubuntu /home/ubuntu/packer-firehawk-amis/modules/firehawk-ami/scripts/deadlinedb_install_with_certs.sh
 
+# Store certs with vault
+
+function store_file {
+  local -r file_path="$1"
+  if [[ -z "$2" ]]; then
+    local target="$resourcetier/deadlinedb/client_cert_files/$file_path"
+  else
+    local target="$2"
+  fi
+
+  if sudo test -f "$file_path"; then
+    vault kv put -address="$VAULT_ADDR" -format=json $target file="$(sudo cat $file_path)"
+    if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
+        octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
+    else
+        octal_permissions=$(sudo stat --format '%a' $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev) # clip to 4 zeroes
+    fi
+    octal_permissions=$( python3 -c "print( \"$octal_permissions\".zfill(4) )" ) # pad to 4 zeroes
+    vault kv patch -address="$VAULT_ADDR" -format=json $target permissions="$octal_permissions"
+    file_uid="$(sudo stat --format '%u' $file_path)"
+    vault kv patch -address="$VAULT_ADDR" -format=json $target owner="$(sudo id -un -- $file_uid)"
+    vault kv patch -address="$VAULT_ADDR" -format=json $target uid="$file_uid"
+    file_gid="$(sudo stat --format '%g' $file_path)"
+    vault kv patch -address="$VAULT_ADDR" -format=json $target gid="$file_gid"
+  else
+    print "Error: file not found: $file_path"
+    exit 1
+  fi
+}
+
+# Store generated certs in vault
+
+store_file "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+
+set -o history
+echo "Done."
+
 # Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
 service_name="deadlinedb"
 consul services register -name=$service_name
