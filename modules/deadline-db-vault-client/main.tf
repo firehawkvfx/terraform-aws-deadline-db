@@ -54,8 +54,17 @@ resource "aws_security_group" "deadline_db_vault_client" {
     description = "all outgoing traffic"
   }
 }
+
+
 data "template_file" "user_data_auth_client" {
-  template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
+  # template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
+  # Combine multiple template files.
+  template = "${format("%s%s", 
+    file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"), 
+    file("${path.module}/user-data-install-deadline-db.sh"),
+    file("${path.module}/user-data-revoke-token.sh.sh")
+    )}"
+
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
     consul_cluster_tag_value = var.consul_cluster_name

@@ -19,16 +19,6 @@ function has_yum {
   [[ -n "$(command -v yum)" ]]
 }
 
-if $(has_yum); then
-    hostname=$(hostname -s) # in centos, failed dns lookup can cause commands to slowdown
-    echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
-    hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
-    # systemctl restart network # we restart the network later, needed to update the host name
-fi
-
-log "hostname: $(hostname)"
-log "hostname: $(hostname -f) $(hostname -s)"
-
 # These variables are passed in via Terraform template interpolation
 /opt/consul/bin/run-consul --client --cluster-tag-key "${consul_cluster_tag_key}" --cluster-tag-value "${consul_cluster_tag_value}"
 
@@ -145,7 +135,6 @@ function ensure_known_hosts {
   log "Added CA to $ssh_known_hosts_path."
 }
 ensure_known_hosts /etc/ssh/ssh_known_hosts
-# ensure_known_hosts /home/centos/.ssh/known_hosts
 
 # # stop network while making changes to avoid early connection unrecognised host warnings
 # systemctl stop sshd
@@ -170,15 +159,6 @@ if $(has_yum); then
 else # assume ubuntu
   systemctl restart systemd-networkd
 fi
-
-# Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
-service_name="deadlinedb"
-consul services register -name=$service_name
-sleep 5
-consul catalog services
-dig $service_name.service.consul
-result=$(dig +short $service_name.service.consul) && exit_status=0 || exit_status=$?
-if [[ ! $exit_status -eq 0 ]]; then echo "No DNS entry found for $service_name.service.consul"; exit 1; fi
 
 log "Signing SSH host key done. Revoking vault token..."
 vault token revoke -self
