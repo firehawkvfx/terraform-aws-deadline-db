@@ -26,6 +26,7 @@ retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 
+vault token lookup #  TODO remove this - testing only
 # Store certs with vault
 
 function store_file {
