@@ -20,6 +20,12 @@ log "hostname: $(hostname -f) $(hostname -s)"
 sudo -u ubuntu git clone --branch ${deadline_installer_script_branch} ${deadline_installer_script_repo} /home/ubuntu/packer-firehawk-amis
 sudo -u ubuntu /home/ubuntu/packer-firehawk-amis/modules/firehawk-ami/scripts/deadlinedb_install_with_certs.sh
 
+export VAULT_ADDR=https://vault.service.consul:8200
+### Vault Auth IAM Method CLI
+retry \
+  "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
+  "Waiting for Vault login"
+
 # Store certs with vault
 
 function store_file {
@@ -53,6 +59,9 @@ function store_file {
 # Store generated certs in vault
 
 store_file "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+
+log "Revoking vault token..."
+vault token revoke -self
 
 set -o history
 echo "Done."

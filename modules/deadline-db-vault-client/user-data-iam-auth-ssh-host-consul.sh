@@ -52,7 +52,6 @@ function retry {
 # The necessary environment variables have to be set
 
 export VAULT_ADDR=https://vault.service.consul:8200
-
 ### Vault Auth IAM Method CLI
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
@@ -151,8 +150,8 @@ else # assume ubuntu
   systemctl restart systemd-networkd
 fi
 
-# log "Signing SSH host key done. Revoking vault token..."
-# vault token revoke -self
+log "Signing SSH host key done. Revoking vault token..."
+vault token revoke -self
 
 # if this script fails, we can set the instance health status but we need to capture a fault
 # aws autoscaling set-instance-health --instance-id i-0b03e12682e74746e --health-status Unhealthy
