@@ -59,7 +59,7 @@ resource "aws_security_group" "deadline_db_vault_client" {
 data "template_file" "user_data_auth_client" {
   # template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
   # Combine multiple template files.
-  template = "${format("%s%s", 
+  template = "${format("%s%s%s", 
     file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"), 
     file("${path.module}/user-data-install-deadline-db.sh"),
     file("${path.module}/user-data-revoke-token.sh")
