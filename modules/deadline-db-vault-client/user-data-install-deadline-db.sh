@@ -4,6 +4,8 @@ set -e
 
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
+resourcetier=${resourcetier}
+
 if $(has_yum); then
     hostname=$(hostname -s) # in centos, failed dns lookup can cause commands to slowdown
     echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts

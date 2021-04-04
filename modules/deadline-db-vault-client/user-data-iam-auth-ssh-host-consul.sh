@@ -4,7 +4,6 @@
 # built from the Packer template in firehawk-main/modules/terraform-aws-vault-client/modules/vault-client-ami
 
 set -e
-
 # Send the log output from this script to user-data.log, syslog, and the console. From: https://alestic.com/2010/12/ec2-user-data-output/
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
@@ -136,14 +135,6 @@ function ensure_known_hosts {
 }
 ensure_known_hosts /etc/ssh/ssh_known_hosts
 
-# # stop network while making changes to avoid early connection unrecognised host warnings
-# systemctl stop sshd
-# if $(has_yum); then
-#   systemctl stop network # This can be used to avoid unknown host warnings caused by a race condition, at the expense of speed.
-# else # assume ubuntu
-#   systemctl NetworkManager.service stop
-# fi
-
 ### Finally allow users with signed client certs to login.
 # If TrustedUserCAKeys not defined, then add it to sshd_config
 grep -q "^TrustedUserCAKeys" /etc/ssh/sshd_config || echo 'TrustedUserCAKeys' | tee --append /etc/ssh/sshd_config
@@ -160,8 +151,8 @@ else # assume ubuntu
   systemctl restart systemd-networkd
 fi
 
-log "Signing SSH host key done. Revoking vault token..."
-vault token revoke -self
+# log "Signing SSH host key done. Revoking vault token..."
+# vault token revoke -self
 
 # if this script fails, we can set the instance health status but we need to capture a fault
 # aws autoscaling set-instance-health --instance-id i-0b03e12682e74746e --health-status Unhealthy

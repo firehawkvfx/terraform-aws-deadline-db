@@ -57,14 +57,11 @@ resource "aws_security_group" "deadline_db_vault_client" {
 
 
 data "template_file" "user_data_auth_client" {
-  # template = file("${path.module}/user-data-auth-ssh-host-iam-consul-service.sh")
-  # Combine multiple template files.
   template = format("%s%s%s",
     file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
     file("${path.module}/user-data-install-deadline-db.sh"),
     file("${path.module}/user-data-revoke-token.sh")
   )
-
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
     consul_cluster_tag_value = var.consul_cluster_name
@@ -72,8 +69,9 @@ data "template_file" "user_data_auth_client" {
     aws_external_domain      = "" # External domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
 
+    resourcetier                     = var.common_tags["resourcetier"]
     deadline_installer_script_repo   = "https://github.com/firehawkvfx/packer-firehawk-amis.git"
-    deadline_installer_script_branch = "v0.0.4"
+    deadline_installer_script_branch = "deadline-immutable" # TODO This must become immutable - version it
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name
