@@ -25,7 +25,7 @@ sudo -u ubuntu /home/ubuntu/packer-firehawk-amis/modules/firehawk-ami/scripts/de
 function store_file {
   local -r file_path="$1"
   if [[ -z "$2" ]]; then
-    local target="$resourcetier/deadlinedb/client_cert_files/$file_path"
+    local target="$resourcetier/deadline/client_cert_files/$file_path"
   else
     local target="$2"
   fi
