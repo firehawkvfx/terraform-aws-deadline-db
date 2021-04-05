@@ -67,7 +67,7 @@ echo "Revoking vault token..."
 vault token revoke -self
 
 # Install Deadline DB and RCS with certificates
-mkdir -p "$(dirname installer_path)"
+mkdir -p "$(dirname $installer_path)"
 aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path
