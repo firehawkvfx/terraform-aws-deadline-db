@@ -86,7 +86,7 @@ function add_sudo_user() {
   # Create user in sudoers group
   sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
   # Ensure user has passwordless sudo
-  touch "/etc/sudoers.d/98_${user_name}"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_${user_name}"
+  touch "/etc/sudoers.d/98_$user_name"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_$user_name"
   sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
   # Generate a public and private key - some funcitons may error without it.
   sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
