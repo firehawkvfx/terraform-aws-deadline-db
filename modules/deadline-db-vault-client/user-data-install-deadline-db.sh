@@ -5,7 +5,9 @@ set -e
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 deadlineuser_name="${deadlineuser_name}"
-resourcetier=${resourcetier}
+resourcetier="${resourcetier}"
+installers_bucket="${installers_bucket}"
+deadline_version="${deadline_version}"
 
 if $(has_yum); then
     hostname=$(hostname -s) # in centos, failed dns lookup can cause commands to slowdown
@@ -18,8 +20,8 @@ log "hostname: $(hostname)"
 log "hostname: $(hostname -f) $(hostname -s)"
 
 # Install Deadline DB and RCS with certificates
-aws s3api get-object --bucket $installers_bucket --key "install-deadlinedb-with-certs.sh" "/home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh"
-sudo -i -u $deadlineuser_name installers_bucket="${installers_bucket}" deadlineuser_name="${deadlineuser_name}" deadline_version="${deadline_version}" /home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh
+aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "/home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh"
+sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" /home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh
 
 ### Vault Auth IAM Method CLI
 export VAULT_ADDR=https://vault.service.consul:8200
