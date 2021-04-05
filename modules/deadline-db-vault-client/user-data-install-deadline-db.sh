@@ -18,12 +18,6 @@ installer_file="install-deadlinedb-with-certs.sh"
 installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 
 # Functions
-function log {
-  local -r level="$1"
-  local -r message="$2"
-  local -r timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-  >&2 log -e "${timestamp} [${level}] [$SCRIPT_NAME] ${message}"
-}
 function has_yum {
   [[ -n "$(command -v yum)" ]]
 }
@@ -58,7 +52,7 @@ function store_file {
 # Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
 if $(has_yum); then
     hostname=$(hostname -s) 
-    log "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
+    echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
     hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
     # systemctl restart network # we restart the network later, needed to update the host name
 fi
@@ -67,9 +61,9 @@ fi
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
-log "Erasing old certificate before install process."
+echo "Erasing old certificate before install process."
 vault kv put -address="$VAULT_ADDR" "$client_cert_vault_path" -value=""
-log "Revoking vault token..."
+echo "Revoking vault token..."
 vault token revoke -self
 
 # Install Deadline DB and RCS with certificates
@@ -85,15 +79,15 @@ retry \
   "Waiting for Vault login"
 # Store generated certs in vault
 store_file "$client_cert_file_path" "$client_cert_vault_path"
-log "Revoking vault token..."
+echo "Revoking vault token..."
 vault token revoke -self
 
 # Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
-log "...Registering service with consul"
+echo "...Registering service with consul"
 service_name="deadlinedb"
 consul services register -name=$service_name
 sleep 5
 consul catalog services
 dig $service_name.service.consul
 result=$(dig +short $service_name.service.consul) && exit_status=0 || exit_status=$?
-if [[ ! $exit_status -eq 0 ]]; then log "No DNS entry found for $service_name.service.consul"; exit 1; fi
+if [[ ! $exit_status -eq 0 ]]; then echo "No DNS entry found for $service_name.service.consul"; exit 1; fi
