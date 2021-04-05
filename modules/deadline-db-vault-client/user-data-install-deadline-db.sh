@@ -4,7 +4,13 @@ set -e
 
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
-# User Vars
+# User Defaults: these will be replaced with terraform template vars, defaults are provided to allow copy / paste directly into a shell for debugging.  These values will not be used when deployed.
+deadlineuser_name="ubuntu"
+resourcetier="dev"
+installers_bucket="software.$resourcetier.firehawkvfx.com"
+deadline_version="10.1.9.2"
+
+# User Vars: Set by terraform template
 deadlineuser_name="${deadlineuser_name}"
 resourcetier="${resourcetier}"
 installers_bucket="${installers_bucket}"
@@ -62,7 +68,7 @@ retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 echo "Erasing old certificate before install process."
-vault kv put -address="$VAULT_ADDR" "$client_cert_vault_path" -value=""
+vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path"
 echo "Revoking vault token..."
 vault token revoke -self
 
