@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 # User Defaults: these will be replaced with terraform template vars, defaults are provided to allow copy / paste directly into a shell for debugging.  These values will not be used when deployed.
@@ -16,7 +15,7 @@ resourcetier="${resourcetier}"
 installers_bucket="${installers_bucket}"
 deadline_version="${deadline_version}"
 
-# Implicit vars
+# Script vars (implicit)
 VAULT_ADDR=https://vault.service.consul:8200
 client_cert_file_path="/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
 client_cert_vault_path="$resourcetier/deadline/client_cert_files/$client_cert_file_path"
@@ -29,6 +28,28 @@ function has_yum {
 }
 function has_apt_get {
   [[ -n "$(command -v apt-get)" ]]
+}
+# A retry function that attempts to run a command a number of times and returns the output
+function retry {
+  local -r cmd="$1"
+  local -r description="$2"
+  attempts=5
+  for i in $(seq 1 $attempts); do
+    echo "$description"
+    # The boolean operations with the exit status are there to temporarily circumvent the "set -e" at the
+    # beginning of this script which exits the script immediatelly for error status while not losing the exit status code
+    output=$(eval "$cmd") && exit_status=0 || exit_status=$?
+    errors=$(echo "$output") | grep '^{' | jq -r .errors
+    echo "$output"
+    if [[ $exit_status -eq 0 && -z "$errors" ]]; then
+      echo "$output"
+      return
+    fi
+    echo "$description failed. Will sleep for 10 seconds and try again."
+    sleep 10
+  done;
+  echo "$description failed after $attempts attempts."
+  exit $exit_status
 }
 function store_file {
   local -r file_path="$1"
@@ -96,9 +117,10 @@ vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path"
 echo "Revoking vault token..."
 vault token revoke -self
 
-### Install Deadline DB and RCS with certificates
+### Install Deadline
+# DB and RCS with certificates
 mkdir -p "$(dirname $installer_path)"
-aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
+aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path
 sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path

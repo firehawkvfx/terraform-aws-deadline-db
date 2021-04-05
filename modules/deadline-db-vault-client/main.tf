@@ -54,7 +54,6 @@ resource "aws_security_group" "deadline_db_vault_client" {
     description = "all outgoing traffic"
   }
 }
-
 data "aws_s3_bucket" "software_bucket" {
   bucket = "software.${var.bucket_extension}"
 }
@@ -65,7 +64,6 @@ resource "aws_s3_bucket_object" "update_scripts" {
   source   = "${path.module}/scripts/${each.value}"
   etag     = filemd5("${path.module}/scripts/${each.value}")
 }
-
 data "template_file" "user_data_auth_client" {
   template = format("%s%s",
     file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),

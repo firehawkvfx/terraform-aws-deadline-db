@@ -5,32 +5,31 @@
 set -e
 
 # User vars
-
-installers_bucket="${installers_bucket}" # provide these as env vars inline
+installers_bucket="${installers_bucket}"
 deadlineuser_name="${deadlineuser_name}"
 deadline_version="${deadline_version}"
-mongo_url="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
 dbport="27100"
-host_name="deadlinedb.service.consul"
-deadline_client_certificate="Deadline10Client.pfx"
+db_host_name="deadlinedb.service.consul"
 deadline_proxy_certificate="Deadline10RemoteClient.pfx"
+deadline_client_certificate="Deadline10Client.pfx"
+mongo_url="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
 
 # Script vars (implicit)
-server_cert_basename="$host_name"
-deadline_proxy_root_dir="$host_name:4433"
+deadline_proxy_root_dir="$db_host_name:4433"
 deadline_client_certificate_basename="${deadline_client_certificate%.*}"
-deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
-deadline_linux_installers_tar="/tmp/Deadline-${deadline_version}-linux-installers.tar" # temp dir since we just keep the extracted contents for repeat installs.
+deadline_linux_installers_tar="/tmp/Deadline-${deadline_version}-linux-installers.tar"
 deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
 deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
 deadline_installer_dir="/home/$deadlineuser_name/Downloads/$deadline_linux_installers_basename"
+server_cert_basename="$db_host_name"
+deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
+mongo_installer_tgz="/home/$deadlineuser_name/Downloads/$(basename $mongo_url)"
 deadline_db_installer_filename="DeadlineRepository-${deadline_version}-linux-x64-installer.run"
 deadline_client_installer_filename="DeadlineClient-${deadline_version}-linux-x64-installer.run"
-mongo_installer_tgz="/home/$deadlineuser_name/Downloads/$(basename $mongo_url)"
 
 # set hostname
-cat /etc/hosts | grep -m 1 "127.0.0.1   $host_name" || echo "127.0.0.1   $host_name" | sudo tee -a /etc/hosts
-sudo hostnamectl set-hostname $host_name
+cat /etc/hosts | grep -m 1 "127.0.0.1   $db_host_name" || echo "127.0.0.1   $db_host_name" | sudo tee -a /etc/hosts
+sudo hostnamectl set-hostname $db_host_name
 
 # Functions
 function replace_line() {
@@ -84,11 +83,11 @@ if [[ -f "$mongo_installer_tgz" ]]; then
 else
     wget $mongo_url -O $mongo_installer_tgz
 fi
-# Download deadline
+# Download Deadline
 if [[ -f "$deadline_linux_installers_tar" ]]; then
     echo "File already exists: $deadline_linux_installers_tar"
 else
-    # Prefer installation from Thinkbox S3 Bucket.
+    # Prefer installation from Thinkbox S3 Bucket for visibility when a version is deprecated.
     output=$(aws s3api head-object --bucket thinkbox-installers --key "Deadline/${deadline_version}/Linux/${deadline_linux_installers_filename}") && exit_status=0 || exit_status=$?
     if [[ $exit_status -eq 0 ]]; then
         echo "...Downloading Deadline from: thinkbox-installers"
@@ -110,7 +109,6 @@ else
 fi
 
 # Directories and permissions
-
 sudo mkdir -p /opt/Thinkbox
 sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox
 sudo chmod u=rwX,g=rX,o-rwx /opt/Thinkbox
@@ -129,9 +127,9 @@ sudo chmod u=rwX,g=rX,o-rwx "$deadline_client_certificates_location"
 
 sudo mkdir -p $deadline_installer_dir
 
-# Install Deadline DB
+# Extract Installer
 sudo tar -xvf $deadline_linux_installers_tar -C $deadline_installer_dir
-# cd $deadline_installer_dir
+# Install Deadline DB
 sudo $deadline_installer_dir/$deadline_db_installer_filename \
 --mode unattended \
 --debuglevel 2 \
@@ -142,7 +140,7 @@ sudo $deadline_installer_dir/$deadline_db_installer_filename \
 --dbOverwrite true \
 --mongodir /opt/Thinkbox/DeadlineDatabase10 \
 --dbListeningPort $dbport \
---dbhost $host_name \
+--dbhost $db_host_name \
 --dbport $dbport \
 --dbuser $deadlineuser_name \
 --dbauth true \
@@ -238,7 +236,8 @@ sudo mkdir -p /usr/share/desktop-directories
 sudo mkdir -p /opt/Thinkbox/DeadlineRepository10
 sudo chmod u=rwX,g=rwX,o=r /opt/Thinkbox/DeadlineRepository10
 
-# Install RCS
+# Install Client:
+# Deadline RCS
 sudo $deadline_installer_dir/$deadline_client_installer_filename \
 --mode unattended \
 --launcherdaemon true \
@@ -259,7 +258,7 @@ sudo $deadline_installer_dir/$deadline_client_installer_filename \
 --generatedcertdir "${deadline_client_certificates_location}/" \
 --slavestartup false \
 --proxyrootdir $deadline_proxy_root_dir \
---proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate \
+--proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
 # --dbsslpassword avaultpassword \
 # --clientcert_pass avaultpassword \
 # --proxycertificatepassword avaultpassword
