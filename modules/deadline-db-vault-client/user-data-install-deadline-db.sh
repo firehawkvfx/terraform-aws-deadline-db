@@ -20,15 +20,21 @@ log "hostname: $(hostname)"
 log "hostname: $(hostname -f) $(hostname -s)"
 
 # Install Deadline DB and RCS with certificates
-aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "/home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh"
-sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" /home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh
+mkdir -p /home/$deadlineuser_name/Downloads/
+installer_file="install-deadlinedb-with-certs.sh"
+installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
+
+aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
+chown $deadlineuser_name:$deadlineuser_name $installer_path
+chmod u+x $installer_path
+
+sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
 
 ### Vault Auth IAM Method CLI
 export VAULT_ADDR=https://vault.service.consul:8200
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
-
 
 function store_file {
   local -r file_path="$1"
