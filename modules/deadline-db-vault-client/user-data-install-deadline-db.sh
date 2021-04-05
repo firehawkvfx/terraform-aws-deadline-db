@@ -4,46 +4,36 @@ set -e
 
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
+# User Vars
 deadlineuser_name="${deadlineuser_name}"
 resourcetier="${resourcetier}"
 installers_bucket="${installers_bucket}"
 deadline_version="${deadline_version}"
 
-if $(has_yum); then
-    hostname=$(hostname -s) # in centos, failed dns lookup can cause commands to slowdown
-    echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
-    hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
-    # systemctl restart network # we restart the network later, needed to update the host name
-fi
-
-log "hostname: $(hostname)"
-log "hostname: $(hostname -f) $(hostname -s)"
-
-# Install Deadline DB and RCS with certificates
-mkdir -p /home/$deadlineuser_name/Downloads/
+# Implicit vars
+VAULT_ADDR=https://vault.service.consul:8200
+client_cert_file_path="/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+client_cert_vault_path="$resourcetier/deadline/client_cert_files/$client_cert_file_path"
 installer_file="install-deadlinedb-with-certs.sh"
 installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 
-aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
-chown $deadlineuser_name:$deadlineuser_name $installer_path
-chmod u+x $installer_path
-
-sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
-
-### Vault Auth IAM Method CLI
-export VAULT_ADDR=https://vault.service.consul:8200
-retry \
-  "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
-  "Waiting for Vault login"
-
+# Functions
+function log {
+  local -r level="$1"
+  local -r message="$2"
+  local -r timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  >&2 log -e "${timestamp} [${level}] [$SCRIPT_NAME] ${message}"
+}
+function has_yum {
+  [[ -n "$(command -v yum)" ]]
+}
 function store_file {
   local -r file_path="$1"
   if [[ -z "$2" ]]; then
-    local target="$resourcetier/deadline/client_cert_files/$file_path"
+    local target="$resourcetier/files/$file_path"
   else
     local target="$2"
   fi
-
   if sudo test -f "$file_path"; then
     vault kv put -address="$VAULT_ADDR" -format=json $target file="$(sudo cat $file_path | base64 -w 0)"
     if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
@@ -65,20 +55,45 @@ function store_file {
   fi
 }
 
-# Store generated certs in vault
-store_file "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+# Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
+if $(has_yum); then
+    hostname=$(hostname -s) 
+    log "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
+    hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
+    # systemctl restart network # we restart the network later, needed to update the host name
+fi
 
+### Vault Auth IAM Method CLI
+retry \
+  "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
+  "Waiting for Vault login"
+log "Erasing old certificate before install process."
+vault kv put -address="$VAULT_ADDR" "$client_cert_vault_path" -value=""
 log "Revoking vault token..."
 vault token revoke -self
 
-set -o history
-echo "Done."
+# Install Deadline DB and RCS with certificates
+mkdir -p "$(dirname installer_path)"
+aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
+chown $deadlineuser_name:$deadlineuser_name $installer_path
+chmod u+x $installer_path
+sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
+
+### Vault Auth IAM Method CLI
+retry \
+  "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
+  "Waiting for Vault login"
+# Store generated certs in vault
+store_file "$client_cert_file_path" "$client_cert_vault_path"
+log "Revoking vault token..."
+vault token revoke -self
 
 # Register the service with consul.  not that it may not be necesary to set the hostname in the beggining of this user data script, especially if we create a cluster in the future.
+log "...Registering service with consul"
 service_name="deadlinedb"
 consul services register -name=$service_name
 sleep 5
 consul catalog services
 dig $service_name.service.consul
 result=$(dig +short $service_name.service.consul) && exit_status=0 || exit_status=$?
-if [[ ! $exit_status -eq 0 ]]; then echo "No DNS entry found for $service_name.service.consul"; exit 1; fi
+if [[ ! $exit_status -eq 0 ]]; then log "No DNS entry found for $service_name.service.consul"; exit 1; fi
