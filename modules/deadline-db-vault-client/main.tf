@@ -55,6 +55,16 @@ resource "aws_security_group" "deadline_db_vault_client" {
   }
 }
 
+data "aws_s3_bucket" "software_bucket" {
+  bucket = "software.${var.bucket_extension}"
+}
+resource "aws_s3_bucket_object" "update_scripts" {
+  for_each = fileset("${path.module}/scripts/", "*")
+  bucket   = aws_s3_bucket.software_bucket.id
+  key      = each.value
+  source   = "${path.module}/scripts/${each.value}"
+  etag     = filemd5("${path.module}/scripts/${each.value}")
+}
 
 data "template_file" "user_data_auth_client" {
   template = format("%s%s",
@@ -68,9 +78,10 @@ data "template_file" "user_data_auth_client" {
     aws_external_domain      = "" # External domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
 
-    resourcetier                     = var.common_tags["resourcetier"]
-    deadline_installer_script_repo   = "https://github.com/firehawkvfx/packer-firehawk-amis.git"
-    deadline_installer_script_branch = "deadline-immutable" # TODO This must become immutable - version it
+    resourcetier = var.common_tags["resourcetier"]
+    installers_bucket = "software.${var.bucket_extension}"
+    deadlineuser_name = "ubuntu"
+    deadline_version  = "10.1.9.2"
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name
@@ -82,6 +93,7 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
   }
 }
 resource "aws_instance" "deadline_db_vault_client" {
+  depends_on             = [aws_s3_bucket_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
   ami                    = var.deadline_db_ami_id
   instance_type          = var.instance_type

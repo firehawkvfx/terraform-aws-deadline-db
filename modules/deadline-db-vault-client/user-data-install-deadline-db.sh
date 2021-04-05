@@ -4,6 +4,7 @@ set -e
 
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
+deadlineuser_name="${deadlineuser_name}"
 resourcetier=${resourcetier}
 
 if $(has_yum); then
@@ -17,17 +18,15 @@ log "hostname: $(hostname)"
 log "hostname: $(hostname -f) $(hostname -s)"
 
 # Install Deadline DB and RCS with certificates
-sudo -u ubuntu git clone --branch ${deadline_installer_script_branch} ${deadline_installer_script_repo} /home/ubuntu/packer-firehawk-amis
-sudo -u ubuntu /home/ubuntu/packer-firehawk-amis/modules/firehawk-ami/scripts/deadlinedb_install_with_certs.sh
+aws s3api get-object --bucket $installers_bucket --key "install-deadlinedb-with-certs.sh" "/home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh"
+sudo -i -u $deadlineuser_name installers_bucket="${installers_bucket}" deadlineuser_name="${deadlineuser_name}" deadline_version="${deadline_version}" /home/$deadlineuser_name/Downloads/install-deadlinedb-with-certs.sh
 
-export VAULT_ADDR=https://vault.service.consul:8200
 ### Vault Auth IAM Method CLI
+export VAULT_ADDR=https://vault.service.consul:8200
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 
-vault token lookup #  TODO remove this - testing only
-# Store certs with vault
 
 function store_file {
   local -r file_path="$1"
@@ -38,7 +37,7 @@ function store_file {
   fi
 
   if sudo test -f "$file_path"; then
-    vault kv put -address="$VAULT_ADDR" -format=json $target file="$(sudo cat $file_path)"
+    vault kv put -address="$VAULT_ADDR" -format=json $target file="$(sudo cat $file_path | base64 -w 0)"
     if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
         octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
     else
@@ -51,6 +50,7 @@ function store_file {
     vault kv patch -address="$VAULT_ADDR" -format=json $target uid="$file_uid"
     file_gid="$(sudo stat --format '%g' $file_path)"
     vault kv patch -address="$VAULT_ADDR" -format=json $target gid="$file_gid"
+    vault kv patch -address="$VAULT_ADDR" -format=json $target format="base64"
   else
     print "Error: file not found: $file_path"
     exit 1
@@ -58,7 +58,6 @@ function store_file {
 }
 
 # Store generated certs in vault
-
 store_file "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
 
 log "Revoking vault token..."
