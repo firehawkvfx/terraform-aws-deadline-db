@@ -60,7 +60,7 @@ data "aws_s3_bucket" "software_bucket" {
 }
 resource "aws_s3_bucket_object" "update_scripts" {
   for_each = fileset("${path.module}/scripts/", "*")
-  bucket   = aws_s3_bucket.software_bucket.id
+  bucket   = data.aws_s3_bucket.software_bucket.id
   key      = each.value
   source   = "${path.module}/scripts/${each.value}"
   etag     = filemd5("${path.module}/scripts/${each.value}")
