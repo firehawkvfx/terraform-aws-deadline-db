@@ -332,7 +332,7 @@ sudo chmod u=wr,g=r,o=r /opt/Thinkbox/certs/ca.crt
 sudo service deadline10launcher restart
 
 echo "Validate that a connection with the database can be established with the config"
-/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
+sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
 # /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --sslPEMKeyPassword "avaultpassword" --eval 'printjson(db.getCollectionNames())'
 
 # cd $pwd

@@ -58,7 +58,7 @@ function store_file {
   fi
 }
 
-# Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
+### Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
 if $(has_yum); then
     hostname=$(hostname -s) 
     echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
@@ -67,12 +67,6 @@ if $(has_yum); then
 fi
 
 ### Create deadlineuser
-function has_yum {
-  [[ -n "$(command -v yum)" ]]
-}
-function has_apt_get {
-  [[ -n "$(command -v apt-get)" ]]
-}
 function add_sudo_user() {
   local -r user_name="$1"
   if $(has_apt_get); then
@@ -83,12 +77,12 @@ function add_sudo_user() {
     echo "ERROR: Could not find apt-get or yum."
     exit 1
   fi
-  # Create user in sudoers group
+  echo "Adding user: $user_name with groups: $sudo_group $user_name"
   sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
-  # Ensure user has passwordless sudo
+  echo "Adding user as passwordless sudoer."
   touch "/etc/sudoers.d/98_$user_name"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_$user_name"
   sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
-  # Generate a public and private key - some funcitons may error without it.
+  # Generate a public and private key - some tools can fail without one.
   sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
 }
 add_sudo_user $deadlineuser_name
@@ -102,7 +96,7 @@ vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path"
 echo "Revoking vault token..."
 vault token revoke -self
 
-# Install Deadline DB and RCS with certificates
+### Install Deadline DB and RCS with certificates
 mkdir -p "$(dirname $installer_path)"
 aws s3api get-object --bucket "$installers_bucket" --key "install-deadlinedb-with-certs.sh" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
