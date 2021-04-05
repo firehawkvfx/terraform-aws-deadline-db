@@ -5,7 +5,7 @@ set -e
 exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 # User Defaults: these will be replaced with terraform template vars, defaults are provided to allow copy / paste directly into a shell for debugging.  These values will not be used when deployed.
-deadlineuser_name="ubuntu"
+deadlineuser_name="deadlineuser"
 resourcetier="dev"
 installers_bucket="software.$resourcetier.firehawkvfx.com"
 deadline_version="10.1.9.2"
@@ -26,6 +26,9 @@ installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 # Functions
 function has_yum {
   [[ -n "$(command -v yum)" ]]
+}
+function has_apt_get {
+  [[ -n "$(command -v apt-get)" ]]
 }
 function store_file {
   local -r file_path="$1"
@@ -62,6 +65,33 @@ if $(has_yum); then
     hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
     # systemctl restart network # we restart the network later, needed to update the host name
 fi
+
+### Create deadlineuser
+function has_yum {
+  [[ -n "$(command -v yum)" ]]
+}
+function has_apt_get {
+  [[ -n "$(command -v apt-get)" ]]
+}
+function add_sudo_user() {
+  local -r user_name="$1"
+  if $(has_apt_get); then
+    sudo_group=sudo
+  elif $(has_yum); then
+    sudo_group=wheel
+  else
+    echo "ERROR: Could not find apt-get or yum."
+    exit 1
+  fi
+  # Create user in sudoers group
+  sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
+  # Ensure user has passwordless sudo
+  touch "/etc/sudoers.d/98_${user_name}"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_${user_name}"
+  sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
+  # Generate a public and private key - some funcitons may error without it.
+  sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
+}
+add_sudo_user $deadlineuser_name
 
 ### Vault Auth IAM Method CLI
 retry \

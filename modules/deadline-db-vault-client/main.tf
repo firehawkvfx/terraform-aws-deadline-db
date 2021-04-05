@@ -80,7 +80,7 @@ data "template_file" "user_data_auth_client" {
 
     resourcetier = var.common_tags["resourcetier"]
     installers_bucket = "software.${var.bucket_extension}"
-    deadlineuser_name = "ubuntu"
+    deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
     deadline_version  = "10.1.9.2"
   }
 }
