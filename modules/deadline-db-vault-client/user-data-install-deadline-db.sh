@@ -59,20 +59,28 @@ function store_file {
     local target="$2"
   fi
   if sudo test -f "$file_path"; then
-    vault kv put -address="$VAULT_ADDR" -format=json $target file="$(sudo cat $file_path | base64 -w 0)"
+    vault kv put -address="$VAULT_ADDR" "$target/file" "$(sudo cat $file_path | base64 -w 0)"
     if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
         octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
     else
         octal_permissions=$(sudo stat --format '%a' $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev) # clip to 4 zeroes
     fi
     octal_permissions=$( python3 -c "print( \"$octal_permissions\".zfill(4) )" ) # pad to 4 zeroes
-    vault kv patch -address="$VAULT_ADDR" -format=json $target permissions="$octal_permissions"
+    # vault kv patch -address="$VAULT_ADDR" -format=json $target permissions="$octal_permissions"
     file_uid="$(sudo stat --format '%u' $file_path)"
-    vault kv patch -address="$VAULT_ADDR" -format=json $target owner="$(sudo id -un -- $file_uid)"
-    vault kv patch -address="$VAULT_ADDR" -format=json $target uid="$file_uid"
+    # vault kv patch -address="$VAULT_ADDR" -format=json $target owner="$(sudo id -un -- $file_uid)"
+    # vault kv patch -address="$VAULT_ADDR" -format=json $target uid="$file_uid"
     file_gid="$(sudo stat --format '%g' $file_path)"
-    vault kv patch -address="$VAULT_ADDR" -format=json $target gid="$file_gid"
-    vault kv patch -address="$VAULT_ADDR" -format=json $target format="base64"
+    # vault kv patch -address="$VAULT_ADDR" -format=json $target gid="$file_gid"
+    # vault kv patch -address="$VAULT_ADDR" -format=json $target format="base64"
+    blob="{ \
+      \"permissions\":\"$octal_permissions\", \
+      \"owner\":\"$(sudo id -un -- $file_uid)\", \
+      \"uid\":\"$file_uid\", \
+      \"gid\":\"$file_gid\", \
+      \"format\":\"base64\" \
+    }"
+    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" "$($blob | jq)"
   else
     print "Error: file not found: $file_path"
     exit 1
