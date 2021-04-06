@@ -18,7 +18,7 @@ deadline_version="${deadline_version}"
 # Script vars (implicit)
 VAULT_ADDR=https://vault.service.consul:8200
 client_cert_file_path="/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
-client_cert_vault_path="$resourcetier/deadline/client_cert_files/$client_cert_file_path"
+client_cert_vault_path="$resourcetier/deadline/client_cert_files$client_cert_file_path"
 installer_file="install-deadlinedb-with-certs.sh"
 installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 
@@ -59,7 +59,7 @@ function store_file {
     local target="$2"
   fi
   if sudo test -f "$file_path"; then
-    vault kv put -address="$VAULT_ADDR" "$target/file" "$(sudo cat $file_path | base64 -w 0)"
+    vault kv put -address="$VAULT_ADDR" "$target/file" value="$(sudo cat $file_path | base64 -w 0)"
     if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
         octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
     else
