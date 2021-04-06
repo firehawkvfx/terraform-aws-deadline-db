@@ -8,15 +8,17 @@ deadlineuser_name="deadlineuser"
 resourcetier="dev"
 installers_bucket="software.$resourcetier.firehawkvfx.com"
 deadline_version="10.1.9.2"
+example_role_name="deadline-db-vault-role"
 
 # User Vars: Set by terraform template
 deadlineuser_name="${deadlineuser_name}"
 resourcetier="${resourcetier}"
 installers_bucket="${installers_bucket}"
 deadline_version="${deadline_version}"
+example_role_name="${example_role_name}"
 
 # Script vars (implicit)
-VAULT_ADDR=https://vault.service.consul:8200
+export VAULT_ADDR=https://vault.service.consul:8200
 client_cert_file_path="/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
 client_cert_vault_path="$resourcetier/deadline/client_cert_files$client_cert_file_path"
 installer_file="install-deadlinedb-with-certs.sh"
@@ -66,13 +68,8 @@ function store_file {
         octal_permissions=$(sudo stat --format '%a' $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev) # clip to 4 zeroes
     fi
     octal_permissions=$( python3 -c "print( \"$octal_permissions\".zfill(4) )" ) # pad to 4 zeroes
-    # vault kv patch -address="$VAULT_ADDR" -format=json $target permissions="$octal_permissions"
     file_uid="$(sudo stat --format '%u' $file_path)"
-    # vault kv patch -address="$VAULT_ADDR" -format=json $target owner="$(sudo id -un -- $file_uid)"
-    # vault kv patch -address="$VAULT_ADDR" -format=json $target uid="$file_uid"
     file_gid="$(sudo stat --format '%g' $file_path)"
-    # vault kv patch -address="$VAULT_ADDR" -format=json $target gid="$file_gid"
-    # vault kv patch -address="$VAULT_ADDR" -format=json $target format="base64"
     blob="{ \
       \"permissions\":\"$octal_permissions\", \
       \"owner\":\"$(sudo id -un -- $file_uid)\", \
@@ -80,7 +77,8 @@ function store_file {
       \"gid\":\"$file_gid\", \
       \"format\":\"base64\" \
     }"
-    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" "$($blob | jq)"
+    jq_parse=$( echo "$blob" | jq -c -r '.' )
+    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" value="$jq_parse"
   else
     print "Error: file not found: $file_path"
     exit 1
@@ -121,7 +119,8 @@ retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 echo "Erasing old certificate before install process."
-vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path"
+vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path/file"
+vault kv delete -address="$VAULT_ADDR" "$client_cert_vault_path/permissions"
 echo "Revoking vault token..."
 vault token revoke -self
 
@@ -138,6 +137,7 @@ retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 # Store generated certs in vault
+echo "...Store certificate."
 store_file "$client_cert_file_path" "$client_cert_vault_path"
 echo "Revoking vault token..."
 vault token revoke -self
