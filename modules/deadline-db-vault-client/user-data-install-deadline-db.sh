@@ -25,6 +25,11 @@ installer_file="install-deadlinedb-with-certs.sh"
 installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 
 # Functions
+function log {
+ local -r message="$1"
+ local -r timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+ >&2 echo -e "$timestamp $message"
+}
 function has_yum {
   [[ -n "$(command -v yum)" ]]
 }
@@ -36,21 +41,26 @@ function retry {
   local -r cmd="$1"
   local -r description="$2"
   attempts=5
+
   for i in $(seq 1 $attempts); do
-    echo "$description"
+    log "$description"
+
     # The boolean operations with the exit status are there to temporarily circumvent the "set -e" at the
     # beginning of this script which exits the script immediatelly for error status while not losing the exit status code
     output=$(eval "$cmd") && exit_status=0 || exit_status=$?
     errors=$(echo "$output") | grep '^{' | jq -r .errors
-    echo "$output"
+
+    log "$output"
+
     if [[ $exit_status -eq 0 && -z "$errors" ]]; then
       echo "$output"
       return
     fi
-    echo "$description failed. Will sleep for 10 seconds and try again."
+    log "$description failed. Will sleep for 10 seconds and try again."
     sleep 10
   done;
-  echo "$description failed after $attempts attempts."
+
+  log "$description failed after $attempts attempts."
   exit $exit_status
 }
 function store_file {
