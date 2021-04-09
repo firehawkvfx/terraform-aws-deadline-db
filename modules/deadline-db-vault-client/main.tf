@@ -65,9 +65,12 @@ resource "aws_s3_bucket_object" "update_scripts" {
   etag     = filemd5("${path.module}/scripts/${each.value}")
 }
 data "template_file" "user_data_auth_client" {
-  template = format("%s%s",
-    file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
-    file("${path.module}/user-data-install-deadline-db.sh")
+  # template = format("%s%s",
+  #   file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
+  #   file("${path.module}/user-data-install-deadline-db.sh")
+  # )
+  template = format("%s",
+    file("${path.module}/user-data-iam-auth-ssh-host-consul.sh")
   )
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
@@ -76,10 +79,10 @@ data "template_file" "user_data_auth_client" {
     aws_external_domain      = "" # External domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
 
-    resourcetier      = var.common_tags["resourcetier"]
-    installers_bucket = "software.${var.bucket_extension}"
-    deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
-    deadline_version  = "10.1.9.2"
+    # resourcetier      = var.common_tags["resourcetier"]
+    # installers_bucket = "software.${var.bucket_extension}"
+    # deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
+    # deadline_version  = "10.1.9.2"
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name
