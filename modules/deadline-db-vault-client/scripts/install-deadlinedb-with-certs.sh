@@ -108,7 +108,7 @@ END
 #         aws s3api get-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" "${deadline_linux_installers_tar}"
 #     fi
 # fi
-
+echo "Setup directories and permissions."
 # Directories and permissions
 sudo mkdir -p /opt/Thinkbox
 sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox
@@ -128,6 +128,7 @@ sudo chmod u=rwX,g=rX,o-rwx "$deadline_client_certificates_location"
 
 sudo mkdir -p $deadline_installer_dir
 
+echo "...Installing Deadline DB."
 # Extract Installer
 # sudo tar -xvf $deadline_linux_installers_tar -C $deadline_installer_dir
 # Install Deadline DB
@@ -236,6 +237,8 @@ sudo apt-get install -y lsb # required for render nodes as well
 sudo mkdir -p /usr/share/desktop-directories
 sudo mkdir -p /opt/Thinkbox/DeadlineRepository10
 sudo chmod u=rwX,g=rwX,o=r /opt/Thinkbox/DeadlineRepository10
+
+echo "...Installing Deadline Client: RCS."
 
 # Install Client:
 # Deadline RCS
