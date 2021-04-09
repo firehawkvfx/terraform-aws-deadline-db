@@ -140,6 +140,10 @@ mkdir -p "$(dirname $installer_path)"
 aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path
+# deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
+# deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
+# deadline_installer_dir="/home/$deadlineuser_name/Downloads/$deadline_linux_installers_basename"
+
 sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
 
 ### Vault Auth IAM Method CLI
