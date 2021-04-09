@@ -18,7 +18,7 @@ deadline_version="${deadline_version}"
 example_role_name="${example_role_name}"
 
 # Script vars (implicit)
-export VAULT_ADDR=https://vault.service.consul:8200
+export VAULT_ADDR="https://vault.service.consul:8200"
 client_cert_file_path="/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
 client_cert_vault_path="$resourcetier/deadline/client_cert_files$client_cert_file_path"
 installer_file="install-deadlinedb-with-certs.sh"
@@ -140,9 +140,6 @@ mkdir -p "$(dirname $installer_path)"
 aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path
-# deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
-# deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
-# deadline_installer_dir="/home/$deadlineuser_name/Downloads/$deadline_linux_installers_basename"
 
 sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
 
