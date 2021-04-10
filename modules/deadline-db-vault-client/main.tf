@@ -79,7 +79,7 @@ data "template_file" "user_data_auth_client" {
     resourcetier      = var.common_tags["resourcetier"]
     installers_bucket = "software.${var.bucket_extension}"
     deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
-    deadline_version  = "10.1.9.2"
+    deadline_version  = var.deadline_version
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name

@@ -7,7 +7,6 @@ exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>
 deadlineuser_name="deadlineuser"
 resourcetier="dev"
 installers_bucket="software.$resourcetier.firehawkvfx.com"
-deadline_version="10.1.9.2"
 example_role_name="deadline-db-vault-role"
 
 # User Vars: Set by terraform template

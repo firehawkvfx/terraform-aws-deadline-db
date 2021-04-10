@@ -91,3 +91,7 @@ variable "bucket_extension" {
     description = "The bucket extension where the software installers reside"
     type = string
 }
+variable "deadline_version" {
+  description = "The deadline version to install"
+  type        = string
+}

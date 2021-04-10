@@ -132,10 +132,6 @@
 # deadline can now be downloaded directly from s3.
 # https://downloads.thinkboxsoftware.com/version_info.json
 
-# aws s3api get-object --bucket thinkbox-installers --key Deadline/10.1.10.6/Windows/DeadlineClient-10.1.10.6-windows-installer.exe DeadlineClient-10.1.10.6-windows-installer.exe
-
-# s3://thinkbox-installers/Deadline/10.1.9.2/Linux/Deadline-10.1.9.2-linux-installers.tar
-
 - name: "Test: Fail if not existing tar."
   fail:
     msg: "Bailing out: You need to place the installer in the download directory.  Installer not found - {{ deadline_linux_installers_tar }}"
