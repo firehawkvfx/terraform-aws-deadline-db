@@ -53,7 +53,7 @@ data "terraform_remote_state" "vpn_security_group" { # read the arn with data.te
   backend = "s3"
   config = {
     bucket = "state.terraform.${var.bucket_extension_vault}"
-    key    = "firehawk-main/modules/terraform-aws-sg-vpn/terraform.tfstate"
+    key    = "firehawk-render-cluster/modules/terraform-aws-sg-vpn/terraform.tfstate"
     region = data.aws_region.current.name
   }
 }
