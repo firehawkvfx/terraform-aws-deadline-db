@@ -14,7 +14,6 @@ resource "aws_security_group" "deadline_db_vault_client" {
     cidr_blocks = var.permitted_cidr_list_private
     description = "all incoming traffic from vpc, vpn dhcp, and remote subnet"
   }
-
   ingress {
     protocol        = "tcp"
     from_port       = 22
@@ -47,7 +46,6 @@ resource "aws_security_group" "deadline_db_vault_client" {
     # security_groups = var.security_group_ids
     description = "Vault Web UI Forwarding"
   }
-  
   ingress {
     protocol    = "icmp"
     from_port   = 8
@@ -73,10 +71,26 @@ resource "aws_s3_bucket_object" "update_scripts" {
   source   = "${path.module}/scripts/${each.value}"
   etag     = filemd5("${path.module}/scripts/${each.value}")
 }
+locals {
+  resourcetier = var.common_tags["resourcetier"]
+  extra_tags = {
+    role  = "deadline_db_vault_client"
+    route = "private"
+  }
+  private_ip                                 = element(concat(aws_instance.deadline_db_vault_client.*.private_ip, list("")), 0)
+  id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
+  deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
+  vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
+  client_cert_file_path                      = "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+  client_cert_vault_path                     = "${local.resourcetier}/deadline/client_cert_files${local.client_cert_file_path}"
+}
 data "template_file" "user_data_auth_client" {
-  template = format("%s%s",
+  template = format(
+    "%s%s%s%s",
     file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
-    file("${path.module}/user-data-install-deadline-db.sh")
+    file("${path.module}/user-data-install-deadline-db.sh"),
+    file("${path.module}/user-data-vault-store-file.sh"),
+    file("${path.module}/user-data-register-consul-service.sh")
   )
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
@@ -85,10 +99,14 @@ data "template_file" "user_data_auth_client" {
     aws_external_domain      = "" # External domain is not used for internal hosts.
     example_role_name        = "deadline-db-vault-role"
 
-    resourcetier      = var.common_tags["resourcetier"]
+    resourcetier      = local.resourcetier
     installers_bucket = "software.${var.bucket_extension}"
     deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
     deadline_version  = var.deadline_version
+    consul_service    = "deadlinedb"
+
+    client_cert_file_path  = local.client_cert_file_path
+    client_cert_vault_path = local.client_cert_vault_path
   }
 }
 data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name
@@ -113,14 +131,4 @@ resource "aws_instance" "deadline_db_vault_client" {
   root_block_device {
     delete_on_termination = true
   }
-}
-locals {
-  extra_tags = {
-    role  = "deadline_db_vault_client"
-    route = "private"
-  }
-  private_ip                                 = element(concat(aws_instance.deadline_db_vault_client.*.private_ip, list("")), 0)
-  id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
-  deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
-  vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
 }
