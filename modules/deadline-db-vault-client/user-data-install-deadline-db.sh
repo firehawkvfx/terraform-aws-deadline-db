@@ -61,37 +61,6 @@ function retry {
   log "$description failed after $attempts attempts."
   exit $exit_status
 }
-function store_file {
-  local -r file_path="$1"
-  if [[ -z "$2" ]]; then
-    local target="$resourcetier/vpn/client_cert_files/$file_path"
-  else
-    local target="$2"
-  fi
-  if sudo test -f "$file_path"; then
-    vault kv put -address="$VAULT_ADDR" "$target/file" value="$(sudo cat $file_path | base64 -w 0)"
-    if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
-        octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
-    else
-        octal_permissions=$(sudo stat --format '%a' $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev) # clip to 4 zeroes
-    fi
-    octal_permissions=$( python3 -c "print( \"$octal_permissions\".zfill(4) )" ) # pad to 4 zeroes
-    file_uid="$(sudo stat --format '%u' $file_path)"
-    file_gid="$(sudo stat --format '%g' $file_path)"
-    blob="{ \
-      \"permissions\":\"$octal_permissions\", \
-      \"owner\":\"$(sudo id -un -- $file_uid)\", \
-      \"uid\":\"$file_uid\", \
-      \"gid\":\"$file_gid\", \
-      \"format\":\"base64\" \
-    }"
-    jq_parse=$( echo "$blob" | jq -c -r '.' )
-    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" value="$jq_parse"
-  else
-    print "Error: file not found: $file_path"
-    exit 1
-  fi
-}
 
 ### Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
 if $(has_yum); then
