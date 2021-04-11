@@ -40,6 +40,15 @@ resource "aws_security_group" "deadline_db_vault_client" {
     description = "Vault Web UI Forwarding"
   }
   ingress {
+    protocol    = "tcp"
+    from_port   = 4433
+    to_port     = 4433
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Vault Web UI Forwarding"
+  }
+  
+  ingress {
     protocol    = "icmp"
     from_port   = 8
     to_port     = 0
