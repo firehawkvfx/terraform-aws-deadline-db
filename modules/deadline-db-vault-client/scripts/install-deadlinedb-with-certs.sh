@@ -145,11 +145,11 @@ sudo $deadline_installer_dir/$deadline_db_installer_filename \
 --dbhost $db_host_name \
 --dbport $dbport \
 --dbuser $deadlineuser_name \
---dbauth true \
 --certgen_outdir $deadline_certificates_location \
 --createX509dbuser true \
 --requireSSL true \
 --dbssl true
+# --dbauth true \
 # --dbpassword avaultpassword \
 # --certgen_password avaultpassword \
 # --dbcertpass avaultpassword

@@ -32,6 +32,14 @@ resource "aws_security_group" "deadline_db_vault_client" {
   }
   ingress {
     protocol    = "tcp"
+    from_port   = 27100
+    to_port     = 27100
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Vault Web UI Forwarding"
+  }
+  ingress {
+    protocol    = "tcp"
     from_port   = 8080
     to_port     = 8080
     cidr_blocks = var.permitted_cidr_list
