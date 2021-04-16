@@ -203,7 +203,7 @@ sudo service Deadline10db stop
 # security:
 #   authorization: enabled
 
-sudo chown ubuntu:ubuntu $deadline_certificates_location/*
+sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
 
 # finalize permissions post install:
 sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/
