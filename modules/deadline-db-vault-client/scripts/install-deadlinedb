@@ -315,7 +315,7 @@ function generate_certs {
 
   # Alternate attempt at generating mongo_client.pem
   python ssl_gen.py --client --cert-name "Deadline10Client" --cert-org "$cert_org" --cert-ou "Deadline10Client" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
-  # Create PEM key - undocumented by Thinkbox
+  # Create PEM key
   cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
   # # RCS proxy cert
