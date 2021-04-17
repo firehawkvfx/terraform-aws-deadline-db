@@ -24,12 +24,12 @@ function print_usage {
   echo
   echo "Options:"
   echo
-  echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require."
-  echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional Default: $DEFAULT_DEADLINEUSER_NAME."
   echo -e "  --deadline-version\t\tThe Version to download and install"
+  echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require. It will also upload any new Deadline installer to this bucket for archival and reprocibility. Optional"
+  echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional Default: $DEFAULT_DEADLINEUSER_NAME."
   echo -e "  --skip-certgen-during-install\t\tInstall without certificates.  Used for building images. Optional."
   echo -e "  --post-certgen\t\tPost configure deadline to use certificates.  Used when deploying a prebuilt image. Optional."
-  echo -e "  --skip-download-installers\t\tSkip downloading installers."
+  echo -e "  --skip-download-installers\t\tSkip downloading installers. Optional"
   echo
   echo "Example:"
   echo
