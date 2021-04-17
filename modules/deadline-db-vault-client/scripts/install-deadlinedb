@@ -346,10 +346,11 @@ function generate_certs {
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    PEMKeyFile:" " $deadline_certificates_location/$server_cert_basename.pem"
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf" "  authorization:" " enabled" # ? not sure what this should be
   LINE=$(cat <<END
-exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "${deadline_certificates_location}/mongo_client.pem" --sslCAFile "${deadline_certificates_location}/ca.crt" --authenticationDatabase '\$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "\$@"
+exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo \"deadline10db\" --host \"deadlinedb.service.consul\" --port \"27100\" --ssl --sslPEMKeyFile \"${deadline_certificates_location}/mongo_client.pem\" --sslCAFile \"${deadline_certificates_location}/ca.crt\" --authenticationDatabase '\$external' --authenticationMechanism \"MONGODB-X509\" --username \"OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client\" \"\$@\"
 END
 )
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"  "exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo" "$LINE"
+
   # we need to modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
   # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
   # Becomes:
