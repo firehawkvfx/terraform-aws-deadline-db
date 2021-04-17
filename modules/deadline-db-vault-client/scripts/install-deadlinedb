@@ -294,7 +294,7 @@ function generate_certs {
   local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
 
-  # Generate Certs
+  # Generate Certs - see https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/proxy-sslgen.html
   if [[ "$skip_install_packages" == "false" ]]; then
     sudo apt-get install -y python-openssl
   fi
