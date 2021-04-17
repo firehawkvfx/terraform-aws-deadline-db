@@ -597,6 +597,7 @@ function options { # Not all defaults are available as args, however the script 
         ;;
       --skip-install-packages)
         skip_install_packages="true"
+        ;;
       --help)
         print_usage
         exit
