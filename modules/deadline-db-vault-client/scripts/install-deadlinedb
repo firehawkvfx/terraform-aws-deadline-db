@@ -140,18 +140,22 @@ function download_deadline {
           echo "...Downloading Deadline from: thinkbox-installers"
           aws s3api get-object --bucket thinkbox-installers --key "Deadline/${deadline_version}/Linux/${deadline_linux_installers_filename}" "${deadline_linux_installers_tar}"
           # If this doesn't exist in user bucket, upload it for reproducibility (incase the Thinkbox installer becomes unavailable).
-          echo "...Querying if this file exists in $installers_bucket"
-          output=$(aws s3api head-object --bucket $installers_bucket --key "$deadline_linux_installers_filename") && exit_status=0 || exit_status=$?
-          if [[ ! $exit_status -eq 0 ]]; then
-              echo "Uploading the file to $installers_bucket $deadline_linux_installers_filename"
-              aws s3api put-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" --body "${deadline_linux_installers_tar}"
-          else
-              echo "The bucket $installers_bucket already contains: $deadline_linux_installers_filename"
+          if [[ -z "$installers_bucket" ]]; then
+            echo "...Querying if this file exists in $installers_bucket"
+            output=$(aws s3api head-object --bucket $installers_bucket --key "$deadline_linux_installers_filename") && exit_status=0 || exit_status=$?
+            if [[ ! $exit_status -eq 0 ]]; then
+                echo "Uploading the file to $installers_bucket $deadline_linux_installers_filename"
+                aws s3api put-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" --body "${deadline_linux_installers_tar}"
+            else
+                echo "The bucket $installers_bucket already contains: $deadline_linux_installers_filename"
+            fi
           fi
       else
           printf "\n\nWarning: The installer was not aquired from Thinkbox.  It may have become deprecated.  Other AWS Accounts will not be able to install this version.\n\n"
-          echo "...Downloading from: $installers_bucket"
-          aws s3api get-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" "${deadline_linux_installers_tar}"
+          if [[ -z "$installers_bucket" ]]; then
+            echo "...Downloading from: $installers_bucket"
+            aws s3api get-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" "${deadline_linux_installers_tar}"
+          fi
       fi
   fi
   sudo mkdir -p $deadline_installer_dir
@@ -597,7 +601,6 @@ function options { # Not all defaults are available as args, however the script 
     shift
   done
 
-  assert_not_empty "--installers-bucket" "$installers_bucket"
   assert_not_empty "--deadline-version" "$deadline_version"
 
   # Implicit vars
