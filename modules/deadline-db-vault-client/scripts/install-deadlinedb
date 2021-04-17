@@ -291,7 +291,7 @@ function generate_certs {
   local -r deadline_client_certificate_basename="$6"
   local -r deadline_client_certificate="$7"
   local -r skip_install_packages="$8"
-  local -r ssl_keygen_base_path="/home/${deadlineuser_name}/Downloads/SSLGeneration"
+  local -r ssl_keygen_base_path="$HOME/Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
 
   # Generate Certs
@@ -345,6 +345,21 @@ function generate_certs {
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    #PEMKeyFile:" "    PEMKeyFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    PEMKeyFile:" " $deadline_certificates_location/$server_cert_basename.pem"
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf" "  authorization:" " enabled" # ? not sure what this should be
+
+# we need to modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
+# #!/bin/sh
+
+# # This script is a simple wrapper that connects to the Deadline Mongo Database utilizing the parameters that were provided at time of installation.
+# # Any extra arguments passed to the script will be transparently passed to the mongo.exe client.
+
+# exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
+
+# @echo off
+
+# REM This script is a simple wrapper that connects to the Deadline Mongo Database utilizing the parameters that were provided at time of installation.
+# REM Any extra arguments passed to the script will be transparently passed to the mongo.exe client.
+
+# exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "${deadline_certificates_location}/mongo_client.pem" --sslCAFile "${deadline_certificates_location}/ca.crt" --authenticationDatabase "$external" --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
 
 }
 
@@ -703,6 +718,9 @@ function options { # Not all defaults are available as args, however the script 
     generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages"
   fi
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
+  
+  echo "Show: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"
+  cat /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
   
   # Install RCS
   install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"

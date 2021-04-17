@@ -116,5 +116,8 @@ chmod u+x $installer_path
 
 # sudo -i -u $deadlineuser_name $installer_path --installers-bucket "$installers_bucket" --deadlineuser-name "$deadlineuser_name" --deadline-version "$deadline_version"
 # test minimal defaults
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers --skip-certgen-during-install --post-certgen
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers
+
+# # generate certs after install test
+# sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers --skip-certgen-during-install --post-certgen
 
