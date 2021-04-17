@@ -70,6 +70,33 @@ function assert_not_empty {
   fi
 }
 
+# A retry function that attempts to run a command a number of times and returns the output
+function retry {
+  local -r cmd="$1"
+  local -r description="$2"
+
+  for i in $(seq 1 30); do
+    log "$description"
+
+    # The boolean operations with the exit status are there to temporarily circumvent the "set -e" at the
+    # beginning of this script which exits the script immediatelly for error status while not losing the exit status code
+    output=$(eval "$cmd") && exit_status=0 || exit_status=$?
+    errors=$(echo "$output") | grep '^{' | jq -r .errors
+
+    log "$output"
+
+    if [[ $exit_status -eq 0 && -n "$output" && -z "$errors" ]]; then
+      echo "$output"
+      return
+    fi
+    log "$description failed. Will sleep for 10 seconds and try again."
+    sleep 10
+  done;
+
+  log "$description failed after 30 attempts."
+  exit $exit_status
+}
+
 function replace_line() {
   local -r filepath=$1
   local -r start=$2
@@ -495,6 +522,30 @@ function configure_auth {
   sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/settings/connection.ini
 }
 
+function start_service_and_validate {
+  local -r dbport="$1"
+  echo "...Validating.  Ensure a connection with the database can be established with the configuration."
+
+  echo "..Start Deadline10db service"
+  sudo service Deadline10db start # Now that config is done start the DB and the launcher.
+  echo "..Start deadline10launcher service"
+  
+  echo "...Waiting for port: $dbport"
+  # while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
+  retry \
+    "timeout 1 bash -c \"echo > /dev/tcp/localhost/$dbport\"" \
+    "Waiting for dbport: $dbport"
+
+  # install "$installers_bucket" "$deadlineuser_name" "$deadline_version" "$skip_certgen_during_install" "$post_certgen" "$dbport" "$proxyport" "$httpport" "$download_dir" "$db_host_name" "$deadline_proxy_certificate" "$deadline_client_certificate" "$mongo_url"
+  sudo service deadline10launcher restart
+  # echo "...Waiting for port: $dbport"
+  # while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
+
+  netstat -lnt
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
+  echo "Deadline Installed Succesfully"
+}
+
 # cat /var/lib/Thinkbox/Deadline10/deadline.ini
 # [Deadline]
 # HttpListenPort=8080
@@ -659,24 +710,11 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$post_certgen" == "true" ]]; then
     configure_auth "$deadlineuser_name"
   fi
-  
-  echo "..Start Deadline10db service"
-  sudo service Deadline10db start # Now that config is done start the DB and the launcher.
-  echo "..Start deadline10launcher service"
-  
-  echo "...Waiting for port: $dbport"
-  while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
 
-  # install "$installers_bucket" "$deadlineuser_name" "$deadline_version" "$skip_certgen_during_install" "$post_certgen" "$dbport" "$proxyport" "$httpport" "$download_dir" "$db_host_name" "$deadline_proxy_certificate" "$deadline_client_certificate" "$mongo_url"
-  sudo service deadline10launcher restart
+  # Start the service and validate the configuration is working
+  start_service_and_validate "$dbport"
 
-  # echo "...Waiting for port: $dbport"
-  # while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
-
-  netstat -lnt
-  
-  echo "...Validating.  Ensure a connection with the database can be established with the configuration"
-  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
 }
 
 options "$@"
+
