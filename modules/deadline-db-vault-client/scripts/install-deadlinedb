@@ -345,22 +345,15 @@ function generate_certs {
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    #PEMKeyFile:" "    PEMKeyFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    PEMKeyFile:" " $deadline_certificates_location/$server_cert_basename.pem"
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf" "  authorization:" " enabled" # ? not sure what this should be
-
-# we need to modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
-# #!/bin/sh
-
-# # This script is a simple wrapper that connects to the Deadline Mongo Database utilizing the parameters that were provided at time of installation.
-# # Any extra arguments passed to the script will be transparently passed to the mongo.exe client.
-
-# exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
-
-# @echo off
-
-# REM This script is a simple wrapper that connects to the Deadline Mongo Database utilizing the parameters that were provided at time of installation.
-# REM Any extra arguments passed to the script will be transparently passed to the mongo.exe client.
-
-# exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "${deadline_certificates_location}/mongo_client.pem" --sslCAFile "${deadline_certificates_location}/ca.crt" --authenticationDatabase "$external" --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
-
+  LINE=$(cat <<END
+exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "${deadline_certificates_location}/mongo_client.pem" --sslCAFile "${deadline_certificates_location}/ca.crt" --authenticationDatabase '\$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "\$@"
+END
+)
+  replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"  "exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo" "$LINE"
+  # we need to modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
+  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
+  # Becomes:
+  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "/opt/Thinkbox/DeadlineDatabase10/certs/mongo_client.pem" --sslCAFile "/opt/Thinkbox/DeadlineDatabase10/certs/ca.crt" --authenticationDatabase '$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
 }
 
 
