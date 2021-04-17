@@ -19,7 +19,7 @@ example_role_name="${example_role_name}"
 # Script vars (implicit)
 export VAULT_ADDR="https://vault.service.consul:8200"
 client_cert_vault_path="${client_cert_vault_path}" # the path will be erased before installation commences
-installer_file="install-deadlinedb-with-certs.sh"
+installer_file="install-deadlinedb"
 installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
 
 # Functions
@@ -114,4 +114,7 @@ aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$ins
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path
 
-sudo -i -u $deadlineuser_name installers_bucket="$installers_bucket" deadlineuser_name="$deadlineuser_name" deadline_version="$deadline_version" $installer_path
+# sudo -i -u $deadlineuser_name $installer_path --installers-bucket "$installers_bucket" --deadlineuser-name "$deadlineuser_name" --deadline-version "$deadline_version"
+# test minimal defaults
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers
+

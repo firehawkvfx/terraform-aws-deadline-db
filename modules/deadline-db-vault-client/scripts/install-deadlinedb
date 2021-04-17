@@ -1,0 +1,654 @@
+#!/bin/bash
+
+# This installs certificates with the DB.
+
+set -e
+
+readonly DEFAULT_DEADLINEUSER_NAME="deadlineuser"
+readonly DEFAULT_DBPORT="27100"
+readonly DEFAULT_PROXYPORT="4433"
+readonly DEFAULT_HTTPPORT="8080"
+readonly DEFAULT_DOWNLOAD_DIR="/var/tmp/downloads"
+readonly DEFAULT_DB_HOST_NAME="deadlinedb.service.consul"
+readonly DEFAULT_DEADLINE_PROXY_CERTIFICATE="Deadline10RemoteClient.pfx"
+readonly DEFAULT_DEADLINE_CLIENT_CERTIFICATE="Deadline10Client.pfx"
+readonly DEFAULT_MONGO_URL="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
+readonly DEFAULT_DOWNLOAD_INSTALLERS="true"
+
+# Functions
+function print_usage {
+  echo
+  echo "Usage: install-deadlinedb [OPTIONS]"
+  echo
+  echo "This script can be used to download and install Deadline DB and RCS.  It optionally configures certificates post install for immutable infrastructure usage. This script has been tested with Ubuntu 18.04."
+  echo
+  echo "Options:"
+  echo
+  echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require."
+  echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional Default: $DEFAULT_DEADLINEUSER_NAME."
+  echo -e "  --deadline-version\t\tThe Version to download and install"
+  echo -e "  --skip-certgen-during-install\t\tInstall without certificates.  Used for building images. Optional."
+  echo -e "  --post-certgen\t\tPost configure deadline to use certificates.  Used when deploying a prebuilt image. Optional."
+  echo -e "  --skip-download-installers\t\tSkip downloading installers."
+  echo
+  echo "Example:"
+  echo
+  echo "  install-deadlinedb --deadline-version 10.1.14.5"
+}
+
+function log {
+  local -r level="$1"
+  local -r message="$2"
+  local -r timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+  >&2 echo -e "${timestamp} [${level}] [$SCRIPT_NAME] ${message}"
+}
+
+function log_info {
+  local -r message="$1"
+  log "INFO" "$message"
+}
+
+function log_warn {
+  local -r message="$1"
+  log "WARN" "$message"
+}
+
+function log_error {
+  local -r message="$1"
+  log "ERROR" "$message"
+}
+
+function assert_not_empty {
+  local -r arg_name="$1"
+  local -r arg_value="$2"
+
+  if [[ -z "$arg_value" ]]; then
+    log_error "The value for '$arg_name' cannot be empty"
+    print_usage
+    exit 1
+  fi
+}
+
+function replace_line() {
+  local -r filepath=$1
+  local -r start=$2
+  local -r end=$3
+  PYTHON_CODE=$(cat <<END
+import argparse
+import sys
+import fileinput
+print("open: {} replace after: {} with: {}".format( "$filepath", "$start", "$end" ))
+for line in fileinput.input(["$filepath"], inplace=True):
+    if line.startswith("$start"):
+        line = '{}\n'.format( "$end" )
+    sys.stdout.write(line)
+END
+)
+  sudo python3 -c "$PYTHON_CODE"
+}
+
+function ensure_value() { # If the pattern matches, the value will be replaced, otherwise it willl be appended.
+  local -r filepath=$1
+  local -r start=$2
+  local -r end=$3
+  PYTHON_CODE=$(cat <<END
+import argparse
+import sys
+import fileinput
+print("open: {} replace after: {} with: {}".format( "$filepath", "$start", "$end" ))
+replaced=False
+for line in fileinput.input(["$filepath"], inplace=True):
+    if line.startswith("$start"):
+        line = '{}{}\n'.format( "$start", "$end" )
+        replaced=True
+    sys.stdout.write(line)
+if replaced==False: # Append if no match
+    with open("$filepath", "a") as file_object:
+        line = '{}{}\n'.format( "$start", "$end" )
+        file_object.write(line)
+END
+)
+  sudo python3 -c "$PYTHON_CODE"
+}
+
+function download_mongo {
+  local -r mongo_installer_tgz="$1"
+  local -r mongo_url="$2"
+
+  # Download mongo
+  if [[ -f "$mongo_installer_tgz" ]]; then
+      echo "File already exists: $mongo_installer_tgz"
+  else
+      wget $mongo_url -O $mongo_installer_tgz
+  fi
+
+}
+
+function download_deadline {
+  local -r deadline_linux_installers_tar="$1"
+  local -r deadline_version="$2"
+  local -r deadline_linux_installers_filename="$3"
+  local -r installers_bucket="$4"
+  local -r deadline_installer_dir="$5"
+
+  if [[ -f "$deadline_linux_installers_tar" ]]; then
+      echo "File already exists: $deadline_linux_installers_tar"
+  else
+      # Prefer installation from Thinkbox S3 Bucket for visibility when a version is deprecated.
+      output=$(aws s3api head-object --bucket thinkbox-installers --key "Deadline/${deadline_version}/Linux/${deadline_linux_installers_filename}") && exit_status=0 || exit_status=$?
+      if [[ $exit_status -eq 0 ]]; then
+          echo "...Downloading Deadline from: thinkbox-installers"
+          aws s3api get-object --bucket thinkbox-installers --key "Deadline/${deadline_version}/Linux/${deadline_linux_installers_filename}" "${deadline_linux_installers_tar}"
+          # If this doesn't exist in user bucket, upload it for reproducibility (incase the Thinkbox installer becomes unavailable).
+          echo "...Querying if this file exists in $installers_bucket"
+          output=$(aws s3api head-object --bucket $installers_bucket --key "$deadline_linux_installers_filename") && exit_status=0 || exit_status=$?
+          if [[ ! $exit_status -eq 0 ]]; then
+              echo "Uploading the file to $installers_bucket $deadline_linux_installers_filename"
+              aws s3api put-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" --body "${deadline_linux_installers_tar}"
+          else
+              echo "The bucket $installers_bucket already contains: $deadline_linux_installers_filename"
+          fi
+      else
+          printf "\n\nWarning: The installer was not aquired from Thinkbox.  It may have become deprecated.  Other AWS Accounts will not be able to install this version.\n\n"
+          echo "...Downloading from: $installers_bucket"
+          aws s3api get-object --bucket $installers_bucket --key "$deadline_linux_installers_filename" "${deadline_linux_installers_tar}"
+      fi
+  fi
+  sudo mkdir -p $deadline_installer_dir
+  # Extract Installer
+  sudo tar -xvf $deadline_linux_installers_tar -C $deadline_installer_dir
+
+}
+
+function setup_directories_and_permissions {
+  local -r deadlineuser_name="$1"
+  local -r deadline_certificates_location="$2"
+  local -r deadline_client_certificates_location="$3"
+
+  echo "Setup directories and permissions."
+  # Directories and permissions
+  sudo mkdir -p /opt/Thinkbox
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox
+  sudo chmod u=rwX,g=rX,o-rwx /opt/Thinkbox
+
+  # DB certs by default live here
+  sudo mkdir -p "$deadline_certificates_location"
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location
+  sudo chmod u=rwX,g=rX,o-rwx "$deadline_certificates_location"
+
+  # Client certs live here
+  sudo mkdir -p "$deadline_client_certificates_location"
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location
+  sudo chmod u=rwX,g=rX,o-rwx "$deadline_client_certificates_location"
+}
+
+function install_db_with_certs {
+  echo "...Install DB with certificates"
+  local -r deadline_installer_dir="$1"
+  local -r deadline_db_installer_filename="$2"
+  local -r mongo_installer_tgz="$3"
+  local -r dbport="$4"
+  local -r db_host_name="$5"
+  local -r deadlineuser_name="$6"
+  local -r deadline_certificates_location="$7"
+
+  # Install Deadline DB
+  sudo $deadline_installer_dir/$deadline_db_installer_filename \
+  --mode unattended \
+  --debuglevel 2 \
+  --prefix /opt/Thinkbox/DeadlineRepository10 \
+  --setpermissions true \
+  --installmongodb true \
+  --prepackagedDB $mongo_installer_tgz \
+  --dbOverwrite true \
+  --mongodir /opt/Thinkbox/DeadlineDatabase10 \
+  --dbListeningPort $dbport \
+  --dbhost $db_host_name \
+  --dbport $dbport \
+  --dbuser $deadlineuser_name \
+  --certgen_outdir $deadline_certificates_location \
+  --createX509dbuser true \
+  --requireSSL true \
+  --dbssl true
+  # --dbauth true \
+  # --dbpassword avaultpassword \
+  # --certgen_password avaultpassword \
+  # --dbcertpass avaultpassword
+
+}
+
+function install_db_without_certs {
+  echo "...Install DB without certificates"
+  local -r deadline_installer_dir="$1"
+  local -r deadline_db_installer_filename="$2"
+  local -r mongo_installer_tgz="$3"
+  local -r dbport="$4"
+  local -r db_host_name="$5"
+  local -r deadlineuser_name="$6"
+  local -r deadline_certificates_location="$7"
+
+  # Install Deadline DB
+  sudo $deadline_installer_dir/$deadline_db_installer_filename \
+  --mode unattended \
+  --debuglevel 2 \
+  --prefix /opt/Thinkbox/DeadlineRepository10 \
+  --setpermissions true \
+  --installmongodb true \
+  --prepackagedDB $mongo_installer_tgz \
+  --dbOverwrite true \
+  --mongodir /opt/Thinkbox/DeadlineDatabase10 \
+  --dbListeningPort $dbport \
+  --dbhost $db_host_name \
+  --dbport $dbport \
+  --dbuser $deadlineuser_name \
+  --certgen_outdir $deadline_certificates_location \
+  --createX509dbuser true \
+  --requireSSL false \
+  --dbssl false
+  # --dbauth true \
+}
+
+function generate_certs {
+  echo "...Generate certificates."
+  local -r deadlineuser_name="$1"
+  local -r cert_org="$2"
+  local -r cert_ou="$3"
+  local -r server_cert_basename="$4"
+  local -r deadline_certificates_location="$5"
+  local -r deadline_client_certificate_basename="$6"
+  local -r deadline_client_certificate="$7"
+  local -r ssl_keygen_base_path="/home/${deadlineuser_name}/Downloads/SSLGeneration"
+  local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
+
+  # Generate Certs
+  sudo apt-get install -y python-openssl
+  sudo rm -frv "$ssl_keygen_base_path" # if this is a repeated install, clear the keys
+  git clone https://github.com/ThinkboxSoftware/SSLGeneration.git "$ssl_keygen_base_path"
+  cd /home/$deadlineuser_name/Downloads/SSLGeneration
+
+  # CA
+  python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$cert_ou"
+  # Server Cert
+  python ssl_gen.py --server --cert-name "$server_cert_basename"
+  # Create PEM key - undocumented by Thinkbox
+  cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
+  # mongo client pem file is undocumented.  Try this.
+  python ssl_gen.py --server --cert-name mongo_client
+  # Create PEM key - undocumented by Thinkbox
+  cat "${ssl_keygen_path}/mongo_client.crt" "${ssl_keygen_path}/mongo_client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem"
+
+  # # RCS proxy cert
+  # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
+  # python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename"
+  # Remote Client Cert ? not sure how this works yet, sinc RCS is supposed to create that.
+  python ssl_gen.py --client --cert-name $deadline_client_certificate_basename --cert-ou "$deadline_client_certificate_basename" # The deadline install by default produces a different ou for the client cert than the ca.  We match that here.
+  python ssl_gen.py --pfx --cert-name $deadline_client_certificate_basename
+
+  # Relocate certs
+  # sudo rm -frv $deadline_certificates_location/* # Remove invalid previous certs if present
+
+  sudo mv -v "${ssl_keygen_path}/ca.crt" "$deadline_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/$deadline_client_certificate" "$deadline_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/${server_cert_basename}.pem" "$deadline_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_certificates_location"
+
+  # Certs Permissions
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
+  sudo chmod u=r,g=r,o=r "${deadline_certificates_location}/${deadline_client_certificate}"
+  sudo chmod o-rwx ${deadline_certificates_location}/$deadline_client_certificate
+  sudo chmod o-rwx "${deadline_certificates_location}/${server_cert_basename}.pem"
+  sudo chmod o-rwx "${deadline_certificates_location}/mongo_client.pem"
+
+  # stop service before updating config.
+  sudo service Deadline10db stop
+
+  # Configure Mongo : /opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf
+  ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"        "    mode:" " requireSSL"
+  replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"      "    #CAFile:" "    CAFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
+  ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"      "    CAFile:" " $deadline_certificates_location/ca.crt"
+  replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    #PEMKeyFile:" "    PEMKeyFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
+  ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    PEMKeyFile:" " $deadline_certificates_location/$server_cert_basename.pem"
+  ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf" "  authorization:" " enabled" # ? not sure what this should be
+
+}
+
+
+
+
+
+
+# After DB install, certs exist here
+# ls -ltriah /opt/Thinkbox/DeadlineDatabase10/certs/
+# total 24K
+# 522562 drwxr-xr-x 4 root   root   4.0K Apr  3 23:27 ..
+# 768030 -r--r----- 1 ubuntu ubuntu 1.2K Apr  3 23:27 ca.crt
+# 768038 -r--r----- 1 ubuntu ubuntu 3.3K Apr  3 23:27 Deadline10Client.pfx
+# 768034 -r--r----- 1 ubuntu ubuntu 2.9K Apr  3 23:27 deadlinedb.service.consul.pem
+# 768036 -r--r----- 1 ubuntu ubuntu 3.0K Apr  3 23:27 mongo_client.pem
+
+# and after RCS:
+# ls -ltriah /opt/Thinkbox/certs/
+# total 20K
+# 521283 -r-------- 1 ubuntu root   1.2K Apr  3 23:29 ca.crt
+# 521289 -r-------- 1 ubuntu root   3.3K Apr  3 23:29 deadlinedb.service.consul.pfx
+# 521292 -r-------- 1 root   root   3.3K Apr  3 23:29 Deadline10RemoteClient.pfx
+
+#MongoDB config file
+# systemLog:
+#   destination: file
+#   # Mongo DB's output will be logged here.
+#   path: /opt/Thinkbox/DeadlineDatabase10/mongo/data/logs/log.txt
+#   # Default to quiet mode to limit log output size. Set to 'false' when debugging.
+#   quiet: true
+#   # Increase verbosity level for more debug messages (max: 5)
+#   verbosity: 0
+# net:
+#   # Port MongoDB will listen on for incoming connections
+#   port: 27100
+#   ipv6: true
+#   ssl:
+#     # SSL/TLS options
+#     mode: requireSSL
+#     # If enabling TLS, the below options need to be set:
+#     PEMKeyFile: /opt/Thinkbox/DeadlineDatabase10/certs/deadlinedb.service.consul.pem
+#     CAFile: /opt/Thinkbox/DeadlineDatabase10/certs/ca.crt
+#   # By default mongo will only use localhost, this will allow us to use the IP Address
+#   bindIpAll: true
+# storage:
+#   # Database files will be stored here
+#   dbPath: /opt/Thinkbox/DeadlineDatabase10/mongo/data
+#   engine: wiredTiger
+# security:
+#   authorization: enabled
+
+function post_db_install_permissions {
+  echo "...Configure permissions post DB install"
+  local -r deadlineuser_name="$1"
+  local -r deadline_certificates_location="$2"
+
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
+
+  # finalize permissions post install:
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/
+  sudo chmod u+rX,g+rX,o-rwx /opt/Thinkbox/
+
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location
+  sudo chmod u+rX,g+rX,o-rwx $deadline_certificates_location
+
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location
+  sudo chmod u+rX,g+rX,o-rwx $deadline_client_certificates_location
+
+  sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10
+  sudo chmod -R u=rX,g=rX,o-rwx /opt/Thinkbox/DeadlineRepository10
+  sudo chmod u=rwX,g=rwX,o=r /opt/Thinkbox/DeadlineRepository10
+
+  sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/jobs
+  sudo chmod -R u=rwX,g=rwX,o-rwx /opt/Thinkbox/DeadlineRepository10/jobs
+
+  sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/jobsArchived
+  sudo chmod -R u=rwX,g=rwX,o-rwx /opt/Thinkbox/DeadlineRepository10/jobsArchived
+
+  sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/reports
+  sudo chmod -R u=rwX,g=rwX,o-rwx /opt/Thinkbox/DeadlineRepository10/reports
+
+  # Restart Deadline / Mongo service
+  sudo systemctl daemon-reload
+  sudo service Deadline10db start
+}
+
+function install_rcs_with_certs {
+  echo "...Install RCS with certs"
+  local -r deadline_installer_dir="$1"
+  local -r deadline_client_installer_filename="$2"
+  local -r deadline_certificates_location="$3"
+  local -r deadline_client_certificates_location="$4"
+  local -r deadline_client_certificate="$5"
+  local -r deadline_proxy_certificate="$6"
+  local -r deadlineuser_name="$7"
+  local -r httpport="$8"
+  local -r proxyport="$9"
+  local -r deadline_proxy_root_dir="${10}"
+
+  # Directories and Permissions
+  sudo apt-get install -y xdg-utils
+  sudo apt-get install -y lsb # required for render nodes as well
+  sudo mkdir -p /usr/share/desktop-directories
+  echo "...Installing Deadline Client: RCS."
+
+  # Install Client:
+  # Deadline RCS
+  sudo $deadline_installer_dir/$deadline_client_installer_filename \
+  --mode unattended \
+  --launcherdaemon true \
+  --enable-components proxyconfig \
+  --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --debuglevel 2 \
+  --prefix /opt/Thinkbox/Deadline10 \
+  --connectiontype Repository \
+  --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
+  --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --licensemode UsageBased \
+  --daemonuser "$deadlineuser_name" \
+  --connserveruser "$deadlineuser_name" \
+  --httpport $httpport \
+  --tlsport $proxyport \
+  --enabletls true \
+  --tlscertificates generate  \
+  --generatedcertdir "${deadline_client_certificates_location}/" \
+  --slavestartup false \
+  --proxyrootdir $deadline_proxy_root_dir \
+  --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
+  # --dbsslpassword avaultpassword \
+  # --clientcert_pass avaultpassword \
+  # --proxycertificatepassword avaultpassword
+}
+
+function configure_deadline {
+  echo "...Configure Deadline.ini"
+  local -r deadline_proxy_root_dir="$1"
+  local -r deadline_certificates_location="$2"
+  local -r deadline_client_certificate="$3"
+  local -r deadline_client_certificates_location="$4"
+  local -r deadline_proxy_certificate="$5"
+
+  # Configure /var/lib/Thinkbox/Deadline10/deadline.ini
+  
+  # stop service before updating config.
+  sudo service Deadline10db stop
+
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "LaunchPulseAtStartup=" "True"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "LaunchRemoteConnectionServerAtStartup=" "True"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "ProxyRoot=" "$deadline_proxy_root_dir"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "ProxyUseSSL=" "True"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "DbSSLCertificate=" "$deadline_certificates_location/$deadline_client_certificate"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "ProxySSLCertificate=" "$deadline_client_certificates_location/$deadline_proxy_certificate"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "ProxyRoot0=" "$deadline_proxy_root_dir;$deadline_client_certificates_location/$deadline_proxy_certificate"
+  ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "NetworkRoot0=" "/opt/Thinkbox/DeadlineRepository10/;$deadline_certificates_location/$deadline_client_certificate"
+
+  # finalize permissions post install:
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineDatabase10
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/certs/*
+  sudo chmod u=wr,g=r,o-rwx /opt/Thinkbox/certs/*
+  sudo chmod u=wr,g=r,o=r /opt/Thinkbox/certs/ca.crt
+}
+
+function configure_auth {
+  echo "...Configure Auth"
+  local -r deadlineuser_name="$1"
+  # stop service before updating config.
+  sudo service Deadline10db stop
+  # configure /opt/Thinkbox/DeadlineRepository10/settings/connection.ini 
+  ensure_value "/opt/Thinkbox/DeadlineRepository10/settings/connection.ini" "Authenticate=" "True"
+  ensure_value "/opt/Thinkbox/DeadlineRepository10/settings/connection.ini" "EnableSSL=" "True"
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/settings/connection.ini
+}
+
+# cat /var/lib/Thinkbox/Deadline10/deadline.ini
+# [Deadline]
+# HttpListenPort=8080
+# TlsListenPort=4433
+# TlsServerCert=/opt/Thinkbox/certs//deadlinedb.service.consul.pfx
+# TlsCaCert=/opt/Thinkbox/certs//ca.crt
+# TlsAuth=True
+# LaunchRemoteConnectionServerAtStartup=True
+# KeepRemoteConnectionServerRunning=True
+# LicenseMode=Standard
+# LicenseServer=
+# Region=
+# LauncherListeningPort=17000
+# LauncherServiceStartupDelay=60
+# AutoConfigurationPort=17001
+# SlaveStartupPort=17003
+# SlaveDataRoot=
+# RestartStalledSlave=false
+# NoGuiMode=false
+# LaunchSlaveAtStartup=false
+# AutoUpdateOverride=
+# IncludeRCSInLauncherMenu=true
+# ConnectionType=Repository
+# NetworkRoot=/opt/Thinkbox/DeadlineRepository10/
+# DbSSLCertificate=/opt/Thinkbox/DeadlineDatabase10/certs/Deadline10Client.pfx
+# NetworkRoot0=/opt/Thinkbox/DeadlineRepository10/;/opt/Thinkbox/DeadlineDatabase10/certs/Deadline10Client.pfx
+# LaunchPulseAtStartup=True
+# ProxyRoot=deadlinedb.service.consul:4433
+# ProxyUseSSL=True
+# ProxySSLCertificate=/opt/Thinkbox/certs/Deadline10RemoteClient.pfx
+# ProxyRoot0=deadlinedb.service.consul:4433;/opt/Thinkbox/certs/Deadline10RemoteClient.pfx
+
+# cat /opt/Thinkbox/DeadlineRepository10/settings/connection.ini 
+# [Connection]
+# AlternatePort=0
+# Authenticate=True
+# DatabaseName=deadline10db
+# DbType=MongoDB
+# EnableSSL=True
+# Hostname=deadlinedb.service.consul
+# PasswordHash=
+# Port=27100
+# ReplicaSetName=
+# SplitDB=False
+# Username=
+# Version=10
+# StorageAccess=Database
+# CACertificatePath=
+
+
+
+# /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --sslPEMKeyPassword "avaultpassword" --eval 'printjson(db.getCollectionNames())'
+
+function set_hostname {
+  db_host_name="$1"
+  # set hostname
+  cat /etc/hosts | grep -m 1 "127.0.0.1   $db_host_name" || echo "127.0.0.1   $db_host_name" | sudo tee -a /etc/hosts
+  sudo hostnamectl set-hostname $db_host_name
+}
+
+function options { # Not all defaults are available as args, however the script has been built to easily alter this.
+  local installers_bucket=""
+  local deadlineuser_name="$DEFAULT_DEADLINEUSER_NAME"
+  local skip_certgen_during_install="false"
+  local post_certgen="false"
+  local dbport="$DEFAULT_DBPORT"
+  local proxyport="$DEFAULT_PROXYPORT"
+  local httpport="$DEFAULT_HTTPPORT"
+  local download_dir="$DEFAULT_DOWNLOAD_DIR"
+  local db_host_name="$DEFAULT_DB_HOST_NAME"
+  local deadline_proxy_certificate="$DEFAULT_DEADLINE_PROXY_CERTIFICATE"
+  local deadline_client_certificate="$DEFAULT_DEADLINE_CLIENT_CERTIFICATE"
+  local mongo_url="$DEFAULT_MONGO_URL"
+  local download_installers="true"
+
+  while [[ $# > 0 ]]; do
+    local key="$1"
+
+    case "$key" in
+      --installers-bucket)
+        installers_bucket="$2"
+        shift
+        ;;
+      --deadlineuser-name)
+        deadlineuser_name="$2"
+        shift
+        ;;
+      --deadline-version)
+        deadline_version="$2"
+        shift
+        ;;
+      --skip-certgen-during-install)
+        skip_certgen_during_install="true"
+        ;;
+      --post-certgen)
+        post_certgen="true"
+        ;;
+      --skip-download-installers)
+        download_installers="false"
+      --help)
+        print_usage
+        exit
+        ;;
+      *)
+        log_error "Unrecognized argument: $key"
+        print_usage
+        exit 1
+        ;;
+    esac
+
+    shift
+  done
+
+  assert_not_empty "--installers-bucket" "$installers_bucket"
+  assert_not_empty "--deadline-version" "$deadline_version"
+
+  # Implicit vars
+  cert_org="Deadline10Installer"
+  cert_ou="Deadline10MongoDB"
+  server_cert_basename="$db_host_name"
+  deadline_proxy_root_dir="$db_host_name:$proxyport"
+  deadline_client_certificate_basename="${deadline_client_certificate%.*}"
+  deadline_linux_installers_tar="/tmp/Deadline-${deadline_version}-linux-installers.tar"
+  deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
+  deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
+  deadline_installer_dir="$download_dir/$deadline_linux_installers_basename"
+  server_cert_basename="$db_host_name"
+  deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
+  mongo_installer_tgz="$download_dir/$(basename $mongo_url)"
+  deadline_db_installer_filename="DeadlineRepository-${deadline_version}-linux-x64-installer.run"
+  deadline_client_installer_filename="DeadlineClient-${deadline_version}-linux-x64-installer.run"
+  deadline_certificates_location="/opt/Thinkbox/DeadlineDatabase10/certs"
+  deadline_client_certificates_location="/opt/Thinkbox/certs"
+
+  set_hostname $db_host_name
+
+  # Downloads
+  if [[ "$download_installers"=="true" ]]; then
+    download_mongo "$mongo_installer_tgz" "$mongo_url"
+    download_deadline "$deadline_linux_installers_tar" "$deadline_version" "$deadline_linux_installers_filename" "$installers_bucket" "$deadline_installer_dir"
+  fi
+  setup_directories_and_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificates_location"
+  
+  # Install DB
+  if [[ "$skip_certgen_during_install"=="true" ]]; then
+    install_db_without_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
+  else
+    install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
+  fi
+  if [[ "$post_certgen"=="true" ]]; then
+    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate"
+  fi
+  post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
+  
+  # Install RCS
+  install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir"
+  configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
+  if [[ "$post_certgen"=="true" ]]; then
+    configure_auth "$deadlineuser_name"
+  fi
+  
+  # install "$installers_bucket" "$deadlineuser_name" "$deadline_version" "$skip_certgen_during_install" "$post_certgen" "$dbport" "$proxyport" "$httpport" "$download_dir" "$db_host_name" "$deadline_proxy_certificate" "$deadline_client_certificate" "$mongo_url"
+  sudo service deadline10launcher restart
+  echo "Validate that a connection with the database can be established with the config"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
+
+}
+
+options "$@"
