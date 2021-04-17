@@ -26,7 +26,7 @@ function print_usage {
   echo
   echo -e "  --deadline-version\t\tThe Version to download and install"
   echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require. It will also upload any new Deadline installer to this bucket for archival and reprocibility. Optional"
-  echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional Default: $DEFAULT_DEADLINEUSER_NAME."
+  echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional. Default: $DEFAULT_DEADLINEUSER_NAME."
   echo -e "  --skip-certgen-during-install\t\tInstall without certificates.  Used for building images. Optional."
   echo -e "  --post-certgen\t\tPost configure deadline to use certificates.  Used when deploying a prebuilt image. Optional."
   echo -e "  --skip-download-installers\t\tSkip downloading installers. Optional"
@@ -560,7 +560,7 @@ function options { # Not all defaults are available as args, however the script 
   local deadline_proxy_certificate="$DEFAULT_DEADLINE_PROXY_CERTIFICATE"
   local deadline_client_certificate="$DEFAULT_DEADLINE_CLIENT_CERTIFICATE"
   local mongo_url="$DEFAULT_MONGO_URL"
-  local download_installers="true"
+  local skip_download_installers="false"
 
   while [[ $# > 0 ]]; do
     local key="$1"
@@ -585,7 +585,7 @@ function options { # Not all defaults are available as args, however the script 
         post_certgen="true"
         ;;
       --skip-download-installers)
-        download_installers="false"
+        skip_download_installers="true"
         ;;
       --help)
         print_usage
@@ -624,19 +624,19 @@ function options { # Not all defaults are available as args, however the script 
   set_hostname $db_host_name
 
   # Downloads
-  if [[ "$download_installers"=="true" ]]; then
+  if [[ "$skip_download_installers" == "false" ]]; then
     download_mongo "$mongo_installer_tgz" "$mongo_url"
     download_deadline "$deadline_linux_installers_tar" "$deadline_version" "$deadline_linux_installers_filename" "$installers_bucket" "$deadline_installer_dir"
   fi
   setup_directories_and_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificates_location"
   
   # Install DB
-  if [[ "$skip_certgen_during_install"=="true" ]]; then
+  if [[ "$skip_certgen_during_install" == "true" ]]; then
     install_db_without_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
   else
     install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
   fi
-  if [[ "$post_certgen"=="true" ]]; then
+  if [[ "$post_certgen" == "true" ]]; then
     generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate"
   fi
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
@@ -644,7 +644,7 @@ function options { # Not all defaults are available as args, however the script 
   # Install RCS
   install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir"
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
-  if [[ "$post_certgen"=="true" ]]; then
+  if [[ "$post_certgen" == "true" ]]; then
     configure_auth "$deadlineuser_name"
   fi
   
