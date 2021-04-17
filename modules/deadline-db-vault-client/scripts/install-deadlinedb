@@ -531,10 +531,10 @@ function start_service_and_validate {
   echo "..Start deadline10launcher service"
   
   echo "...Waiting for port: $dbport"
-  # while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
-  retry \
-    "timeout 1 bash -c 'echo > /dev/tcp/localhost/$dbport'" \
-    "Waiting for dbport: $dbport"
+  while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/questions/5277/how-do-i-tell-a-script-to-wait-for-a-process-to-start-accepting-requests-on-a-po#
+  # retry \
+  #   "timeout 1 bash -c 'echo > /dev/tcp/localhost/$dbport'" \
+  #   "Waiting for dbport: $dbport"
 
   # install "$installers_bucket" "$deadlineuser_name" "$deadline_version" "$skip_certgen_during_install" "$post_certgen" "$dbport" "$proxyport" "$httpport" "$download_dir" "$db_host_name" "$deadline_proxy_certificate" "$deadline_client_certificate" "$mongo_url"
   sudo service deadline10launcher restart
