@@ -24,12 +24,13 @@ function print_usage {
   echo
   echo "Options:"
   echo
-  echo -e "  --deadline-version\t\tThe Version to download and install"
+  echo -e "  --deadline-version\t\tThe version to download and install"
   echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require. It will also upload any new Deadline installer to this bucket for archival and reprocibility. Optional"
   echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional. Default: $DEFAULT_DEADLINEUSER_NAME."
   echo -e "  --skip-certgen-during-install\t\tInstall without certificates.  Used for building images. Optional."
   echo -e "  --post-certgen\t\tPost configure deadline to use certificates.  Used when deploying a prebuilt image. Optional."
-  echo -e "  --skip-download-installers\t\tSkip downloading installers. Optional"
+  echo -e "  --skip-download-installers\t\tSkip downloading installers. Used when deploying a prebuilt image. Optional"
+  echo -e "  --skip-install-packages\t\tSkip installing required packages. Used when deploying a prebuilt image. Optional"
   echo
   echo "Example:"
   echo
@@ -261,11 +262,14 @@ function generate_certs {
   local -r deadline_certificates_location="$5"
   local -r deadline_client_certificate_basename="$6"
   local -r deadline_client_certificate="$7"
+  local -r skip_install_packages="$8"
   local -r ssl_keygen_base_path="/home/${deadlineuser_name}/Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
 
   # Generate Certs
-  sudo apt-get install -y python-openssl
+  if [[ "$skip_install_packages" == "false" ]]; then
+    sudo apt-get install -y python-openssl
+  fi
   sudo rm -frv "$ssl_keygen_base_path" # if this is a repeated install, clear the keys
   git clone https://github.com/ThinkboxSoftware/SSLGeneration.git "$ssl_keygen_base_path"
   cd /home/$deadlineuser_name/Downloads/SSLGeneration
@@ -411,11 +415,14 @@ function install_rcs_with_certs {
   local -r httpport="$8"
   local -r proxyport="$9"
   local -r deadline_proxy_root_dir="${10}"
+  local -r skip_install_packages="${11}"
 
   # Directories and Permissions
-  echo "...Install packages for Deadline RCS"
-  sudo apt-get install -y xdg-utils
-  sudo apt-get install -y lsb # required for render nodes as well
+  if [[ "$skip_install_packages" == "false"]]; then
+    echo "...Install packages for Deadline RCS"
+    sudo apt-get install -y xdg-utils
+    sudo apt-get install -y lsb # required for render nodes as well
+  fi
   sudo mkdir -p /usr/share/desktop-directories
 
   echo "...Installing Deadline Client: RCS with certs"
@@ -561,6 +568,7 @@ function options { # Not all defaults are available as args, however the script 
   local deadline_client_certificate="$DEFAULT_DEADLINE_CLIENT_CERTIFICATE"
   local mongo_url="$DEFAULT_MONGO_URL"
   local skip_download_installers="false"
+  local skip_install_packages="false"
 
   while [[ $# > 0 ]]; do
     local key="$1"
@@ -587,6 +595,8 @@ function options { # Not all defaults are available as args, however the script 
       --skip-download-installers)
         skip_download_installers="true"
         ;;
+      --skip-install-packages)
+        skip_install_packages="true"
       --help)
         print_usage
         exit
@@ -597,7 +607,7 @@ function options { # Not all defaults are available as args, however the script 
         exit 1
         ;;
     esac
-
+    
     shift
   done
 
@@ -637,12 +647,12 @@ function options { # Not all defaults are available as args, however the script 
     install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
   fi
   if [[ "$post_certgen" == "true" ]]; then
-    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate"
+    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages"
   fi
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
   
   # Install RCS
-  install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir"
+  install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen" == "true" ]]; then
     configure_auth "$deadlineuser_name"
@@ -653,9 +663,8 @@ function options { # Not all defaults are available as args, however the script 
   echo "..Start deadline10launcher service"
   # install "$installers_bucket" "$deadlineuser_name" "$deadline_version" "$skip_certgen_during_install" "$post_certgen" "$dbport" "$proxyport" "$httpport" "$download_dir" "$db_host_name" "$deadline_proxy_certificate" "$deadline_client_certificate" "$mongo_url"
   sudo service deadline10launcher restart
-  # echo "Validate that a connection with the database can be established with the config"
-  # sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
-
+  echo "...Validating.  Ensure a connection with the database can be established with the configuration"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
 }
 
 options "$@"
