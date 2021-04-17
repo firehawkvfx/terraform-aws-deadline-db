@@ -309,9 +309,14 @@ function generate_certs {
   # Create PEM key - undocumented by Thinkbox
   cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
   # mongo client pem file is undocumented.  Try this.
-  python ssl_gen.py --server --cert-name mongo_client
+  # python ssl_gen.py --server --cert-name mongo_client
+  # # Create PEM key - undocumented by Thinkbox
+  # cat "${ssl_keygen_path}/mongo_client.crt" "${ssl_keygen_path}/mongo_client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem"
+
+  # Alternate attempt at generating mongo_client.pem
+  python ssl_gen.py --client --cert-name "Deadline10Client" --cert-org "$cert_org" --cert-ou "Deadline10Client" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
   # Create PEM key - undocumented by Thinkbox
-  cat "${ssl_keygen_path}/mongo_client.crt" "${ssl_keygen_path}/mongo_client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem"
+  cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
   # # RCS proxy cert
   # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
