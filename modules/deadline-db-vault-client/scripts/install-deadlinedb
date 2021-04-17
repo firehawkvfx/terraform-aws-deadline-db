@@ -316,7 +316,8 @@ function generate_certs {
   # cat "${ssl_keygen_path}/mongo_client.crt" "${ssl_keygen_path}/mongo_client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem"
 
   # Alternate attempt at generating mongo_client.pem
-  # python ssl_gen.py --client --cert-name "Deadline10Client" --cert-org "$cert_org" --cert-ou "Deadline10Client" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
+  echo "...Generate Client Cert"
+  python ssl_gen.py --client --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
   # Create PEM key
   # cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
@@ -324,11 +325,12 @@ function generate_certs {
   # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
   # python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename"
   # Remote Client Cert ? not sure how this works yet, sinc RCS is supposed to create that.
-  echo "...Generate Client Cert"
+  echo "...Generate Client pfx"
   # python ssl_gen.py --client --cert-name $deadline_client_certificate_basename --cert-ou "$deadline_client_certificate_basename" # The deadline install by default produces a different ou for the client cert than the ca.  We match that here.
-  python ssl_gen.py --pfx --cert-name $deadline_client_certificate_basename --cert-ou "$deadline_client_certificate_basename"
+  python ssl_gen.py --pfx --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename"
   # cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
+  echo "...Create mongo_client.pem"
   openssl pkcs12 -in "${ssl_keygen_path}/Deadline10Client.pfx" -out "${ssl_keygen_path}/mongo_client.pem" -nodes
 
   echo "...Relocate certs"
