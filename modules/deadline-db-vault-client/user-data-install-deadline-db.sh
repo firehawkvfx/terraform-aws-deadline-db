@@ -109,7 +109,9 @@ vault token revoke -self
 
 ### Install Deadline
 # DB and RCS with certificates
-mkdir -p "$(dirname $installer_path)"
+echo "Ensuring dir exists: $(dirname $installer_path)"
+sudo -i -u $deadlineuser_name mkdir -p "$(dirname $installer_path)"
+
 aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$installer_path"
 chown $deadlineuser_name:$deadlineuser_name $installer_path
 chmod u+x $installer_path

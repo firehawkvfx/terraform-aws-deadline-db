@@ -291,7 +291,7 @@ function generate_certs {
   local -r deadline_client_certificate_basename="$6"
   local -r deadline_client_certificate="$7"
   local -r skip_install_packages="$8"
-  local -r ssl_keygen_base_path="$HOME/Downloads/SSLGeneration"
+  local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
 
   # Generate Certs
