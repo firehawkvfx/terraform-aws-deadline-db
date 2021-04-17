@@ -582,6 +582,7 @@ function options { # Not all defaults are available as args, however the script 
         ;;
       --skip-download-installers)
         download_installers="false"
+        ;;
       --help)
         print_usage
         exit
