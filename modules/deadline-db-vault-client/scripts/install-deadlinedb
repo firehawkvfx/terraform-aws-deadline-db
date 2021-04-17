@@ -543,7 +543,7 @@ function start_service_and_validate {
 
   netstat -lnt
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
-  echo "Deadline Installed Succesfully"
+  printf "\n\nDeadline Installed Succesfully.\n\n"
 }
 
 # cat /var/lib/Thinkbox/Deadline10/deadline.ini
