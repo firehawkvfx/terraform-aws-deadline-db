@@ -418,7 +418,7 @@ function install_rcs_with_certs {
   local -r skip_install_packages="${11}"
 
   # Directories and Permissions
-  if [[ "$skip_install_packages" == "false"]]; then
+  if [[ "$skip_install_packages" == "false" ]]; then
     echo "...Install packages for Deadline RCS"
     sudo apt-get install -y xdg-utils
     sudo apt-get install -y lsb # required for render nodes as well
@@ -607,7 +607,7 @@ function options { # Not all defaults are available as args, however the script 
         exit 1
         ;;
     esac
-    
+
     shift
   done
 
