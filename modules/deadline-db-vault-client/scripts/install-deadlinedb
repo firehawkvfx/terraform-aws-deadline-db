@@ -319,7 +319,7 @@ function generate_certs {
   echo "...Generate Client Cert"
   python ssl_gen.py --client --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
   # Create PEM key
-  # cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
+
 
   # # RCS proxy cert
   # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
@@ -331,7 +331,8 @@ function generate_certs {
   # cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
   echo "...Create mongo_client.pem"
-  openssl pkcs12 -in "${ssl_keygen_path}/Deadline10Client.pfx" -out "${ssl_keygen_path}/mongo_client.pem" -nodes
+  cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
+  # openssl pkcs12 -in "${ssl_keygen_path}/Deadline10Client.pfx" -out "${ssl_keygen_path}/mongo_client.pem" -nodes
 
   echo "...Relocate certs"
   # sudo rm -frv $deadline_certificates_location/* # Remove invalid previous certs if present
