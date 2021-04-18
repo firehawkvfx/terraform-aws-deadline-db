@@ -295,7 +295,7 @@ function get_ssl_gen_repo {
 }
 
 function generate_certs_for_db_and_rcs {
-  echo "...Generate certificates."
+  echo "...Generate certificates for DB."
   local -r deadlineuser_name="$1"
   local -r cert_org="$2"
   local -r cert_ou="$3"
@@ -386,7 +386,7 @@ END
 }
 
 function generate_certs_for_clients {
-  echo "...Generate certificates."
+  echo "...Generate certificates for client."
   local -r deadlineuser_name="$1"
   local -r cert_org="$2"
   local -r rcs_cert_ou="$3"
@@ -411,8 +411,8 @@ function generate_certs_for_clients {
   echo "...Generate CA"
   python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
   # Server Cert
-  # echo "...Generate Server Cert"
-  python ssl_gen.py --pfx --server --cert-name "$server_cert_basename"
+  echo "...Generate Host PFX Cert: $server_cert_basename"
+  python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
 
   # cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
 
@@ -422,7 +422,7 @@ function generate_certs_for_clients {
   # echo "...Generate hostname pfx: $server_cert_basename" # TODO: This is possibly not used, need to investigate!
   # python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
 
-  echo "...Generate Client Cert: $deadline_proxy_certificate_basename"
+  echo "...Generate Client PFX Cert: $deadline_proxy_certificate_basename"
   python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
 
   echo "...Relocate certs"
@@ -554,55 +554,55 @@ function post_db_install_permissions {
   sudo service Deadline10db start
 }
 
-function install_rcs_generate_certs {
-  local -r deadline_installer_dir="$1"
-  local -r deadline_client_installer_filename="$2"
-  local -r deadline_certificates_location="$3"
-  local -r deadline_client_certificates_location="$4"
-  local -r deadline_client_certificate="$5"
-  local -r deadline_proxy_certificate="$6"
-  local -r deadlineuser_name="$7"
-  local -r httpport="$8"
-  local -r proxyport="$9"
-  local -r deadline_proxy_root_dir="${10}"
-  local -r skip_install_packages="${11}"
+# function install_rcs_generate_certs {
+#   local -r deadline_installer_dir="$1"
+#   local -r deadline_client_installer_filename="$2"
+#   local -r deadline_certificates_location="$3"
+#   local -r deadline_client_certificates_location="$4"
+#   local -r deadline_client_certificate="$5"
+#   local -r deadline_proxy_certificate="$6"
+#   local -r deadlineuser_name="$7"
+#   local -r httpport="$8"
+#   local -r proxyport="$9"
+#   local -r deadline_proxy_root_dir="${10}"
+#   local -r skip_install_packages="${11}"
 
-  # Directories and Permissions
-  if [[ "$skip_install_packages" == "false" ]]; then
-    echo "...Install packages for Deadline RCS"
-    sudo apt-get install -y xdg-utils
-    sudo apt-get install -y lsb # required for render nodes as well
-  fi
-  sudo mkdir -p /usr/share/desktop-directories
+#   # Directories and Permissions
+#   if [[ "$skip_install_packages" == "false" ]]; then
+#     echo "...Install packages for Deadline RCS"
+#     sudo apt-get install -y xdg-utils
+#     sudo apt-get install -y lsb # required for render nodes as well
+#   fi
+#   sudo mkdir -p /usr/share/desktop-directories
 
-  echo "...Installing Deadline Client: RCS with certs"
-  # Install Client:
-  # Deadline RCS
-  sudo $deadline_installer_dir/$deadline_client_installer_filename \
-  --mode unattended \
-  --launcherdaemon true \
-  --enable-components proxyconfig \
-  --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
-  --debuglevel 2 \
-  --prefix /opt/Thinkbox/Deadline10 \
-  --connectiontype Repository \
-  --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
-  --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
-  --licensemode UsageBased \
-  --daemonuser "$deadlineuser_name" \
-  --connserveruser "$deadlineuser_name" \
-  --httpport $httpport \
-  --tlsport $proxyport \
-  --enabletls true \
-  --tlscertificates generate  \
-  --generatedcertdir "${deadline_client_certificates_location}/" \
-  --slavestartup false \
-  --proxyrootdir $deadline_proxy_root_dir \
-  --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
-  # --dbsslpassword avaultpassword \
-  # --clientcert_pass avaultpassword \
-  # --proxycertificatepassword avaultpassword
-}
+#   echo "...Installing Deadline Client: RCS with certs"
+#   # Install Client:
+#   # Deadline RCS
+#   sudo $deadline_installer_dir/$deadline_client_installer_filename \
+#   --mode unattended \
+#   --launcherdaemon true \
+#   --enable-components proxyconfig \
+#   --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
+#   --debuglevel 2 \
+#   --prefix /opt/Thinkbox/Deadline10 \
+#   --connectiontype Repository \
+#   --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
+#   --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
+#   --licensemode UsageBased \
+#   --daemonuser "$deadlineuser_name" \
+#   --connserveruser "$deadlineuser_name" \
+#   --httpport $httpport \
+#   --tlsport $proxyport \
+#   --enabletls true \
+#   --tlscertificates generate  \
+#   --generatedcertdir "${deadline_client_certificates_location}/" \
+#   --slavestartup false \
+#   --proxyrootdir $deadline_proxy_root_dir \
+#   --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
+#   # --dbsslpassword avaultpassword \
+#   # --clientcert_pass avaultpassword \
+#   # --proxycertificatepassword avaultpassword
+# }
 
 function install_rcs_no_generate_certs {
   local -r deadline_installer_dir="$1"
@@ -625,7 +625,7 @@ function install_rcs_no_generate_certs {
   fi
   sudo mkdir -p /usr/share/desktop-directories
 
-  echo "...Installing Deadline Client: RCS with certs"
+  echo "...Installing Deadline Client: RCS with disabled cert generation"
   # Install Client:
   # Deadline RCS
   sudo $deadline_installer_dir/$deadline_client_installer_filename \
