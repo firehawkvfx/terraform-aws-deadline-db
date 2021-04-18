@@ -285,12 +285,16 @@ function start_service_and_validate {
   local -r dbport="$1"
   echo "...Validating.  Ensure a connection with the database can be established with the configuration."
 
-  echo "..Start Deadline10db service"
-  sudo service Deadline10db start # Now that config is done start the DB and the launcher.
-  echo "..Start deadline10launcher service"
-  
+  echo "..Restart Deadline10db service"
+  sudo service Deadline10db restart # Now that config is done start the DB and the launcher.
   echo "...Waiting for port: $dbport"
   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
+  
+  echo "..Restart Deadline10db service" # Sometimes, this is required twice for unknown reasons.
+  sudo service Deadline10db restart
+  echo "...Waiting for port: $dbport"
+  while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
+  
   # sudo service deadline10launcher restart
   # show open ports
   netstat -lnt
