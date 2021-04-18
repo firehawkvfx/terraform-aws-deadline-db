@@ -410,9 +410,10 @@ function generate_certs_for_clients {
   # CA
   echo "...Generate CA"
   python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
+
   # Server Cert
   echo "...Generate Server Cert"
-  python ssl_gen.py --server --cert-name "$server_cert_basename"
+  python ssl_gen.py --server --cert-name "$server_cert_basename" # ? TODO: identify should this be a server or client cert ?
   cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
 
   echo "...Generate Host PFX Cert: $server_cert_basename" # should this be converted from the above instead?
@@ -426,21 +427,24 @@ function generate_certs_for_clients {
   # echo "...Generate hostname pfx: $server_cert_basename" # TODO: This is possibly not used, need to investigate!
   # python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
 
+  echo "...Generate Client Cert: $deadline_proxy_certificate_basename"
+  python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
+
   echo "...Generate Client PFX Cert: $deadline_proxy_certificate_basename"
-  python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
+  python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
 
   echo "...Relocate certs"
   sudo mv -v "${ssl_keygen_path}/ca.crt" "$deadline_client_certificates_location"
-  sudo mv -v "${ssl_keygen_path}/$deadline_client_certificate" "$deadline_client_certificates_location"
-  sudo mv -v "${ssl_keygen_path}/${server_cert_basename}.pem" "$deadline_client_certificates_location"
-  sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_client_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/${server_cert_basename}.pfx" "$deadline_client_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/${deadline_proxy_certificate_basename}.pfx" "$deadline_client_certificates_location"
+  # sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_client_certificates_location"
 
   # Certs Permissions
   sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
-  sudo chmod u=r,g=r,o=r "${deadline_client_certificates_location}/${deadline_client_certificate}"
-  sudo chmod o-rwx ${deadline_client_certificates_location}/$deadline_client_certificate
+  sudo chmod u=r,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+  # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
   sudo chmod o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
-  sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+  # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
 
   # # generate certs for RCS:
   # # CN = CA, O = Deadline10Installer, OU = Deadline10ConnServer
