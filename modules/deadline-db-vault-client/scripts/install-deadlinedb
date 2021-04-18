@@ -27,8 +27,11 @@ function print_usage {
   echo -e "  --deadline-version\t\tThe version to download and install"
   echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require. It will also upload any new Deadline installer to this bucket for archival and reprocibility. Optional"
   echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional. Default: $DEFAULT_DEADLINEUSER_NAME."
-  echo -e "  --skip-certgen-during-db-install\t\tInstall without certificates.  Used for building images. Optional."
-  echo -e "  --post-certgen-db\t\tPost configure deadline to use certificates.  Used when deploying a prebuilt image. Optional."
+  echo -e "  --skip-certgen-during-db-install\t\tInstall DB without generating certificates.  Used for building images. Optional."
+  echo -e "  --skip-certgen-during-rcs-install\t\tInstall RCS without generating certificates.  Used for building images. Optional."
+  echo -e "  --skip-install-db\t\tSkip installing the DB. Optional."
+  echo -e "  --post-certgen-db\t\tPost configure Deadline DB certificates.  Used when deploying a prebuilt image. Optional."
+  echo -e "  --post-certgen-rcs\t\tPost configure remote client and RCS certificates.  Used when deploying a prebuilt image. Optional."
   echo -e "  --skip-download-installers\t\tSkip downloading installers. Used when deploying a prebuilt image. Optional"
   echo -e "  --skip-install-packages\t\tSkip installing required packages. Used when deploying a prebuilt image. Optional"
   echo
@@ -294,12 +297,12 @@ function start_service_and_validate {
   sudo service Deadline10db restart
   echo "...Waiting for port: $dbport"
   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
-  
+
   # sudo service deadline10launcher restart
   # show open ports
   netstat -lnt
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
-  printf "\n\nDeadline Installed Succesfully.\n\n"
+  printf "\n\nDeadline config Succesfully established a connection.\n\n"
 }
 
 function start_launcher {
@@ -646,6 +649,7 @@ function install_rcs_no_generate_certs {
   local -r proxyport="$9"
   local -r deadline_proxy_root_dir="${10}"
   local -r skip_install_packages="${11}"
+  local -r server_cert_basename="${12}"
 
   # Directories and Permissions
   if [[ "$skip_install_packages" == "false" ]]; then
@@ -662,8 +666,8 @@ function install_rcs_no_generate_certs {
   --mode unattended \
   --launcherdaemon true \
   --enable-components proxyconfig \
-  --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
-  --cacert "${deadline_certificates_location}/ca.crt" \
+  --servercert "${deadline_client_certificates_location}/${server_cert_basename}.pfx" \
+  --cacert "${deadline_client_certificates_location}/ca.crt" \
   --debuglevel 2 \
   --prefix /opt/Thinkbox/Deadline10 \
   --connectiontype Repository \
@@ -708,7 +712,7 @@ function install_rcs_generate_certs {
 
   echo "...Installing Deadline Client: RCS with certs"
   # Install Client:
-  # Deadline RCS
+  # Deadline RCS # TODO: consider removing servercert since it is probably incorrect and being regenerated anyway.
   sudo $deadline_installer_dir/$deadline_client_installer_filename \
   --mode unattended \
   --launcherdaemon true \
@@ -747,6 +751,9 @@ function configure_deadline {
   
   # stop service before updating config.
   sudo service Deadline10db stop
+
+  # ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "TlsServerCert=" "/opt/Thinkbox/certs//deadlinedb.service.consul.pfx"
+  # ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "TlsCaCert=" "/opt/Thinkbox/certs//ca.crt"
 
   ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "LaunchPulseAtStartup=" "True"
   ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "LaunchRemoteConnectionServerAtStartup=" "True"
@@ -959,7 +966,7 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
     install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
   else
-    install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+    install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages" "$server_cert_basename"
   fi
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen_db" == "true" ]]; then
