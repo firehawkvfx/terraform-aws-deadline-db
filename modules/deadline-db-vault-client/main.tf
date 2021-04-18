@@ -133,6 +133,7 @@ data "template_file" "user_data_auth_client" {
     example_role_name        = "deadline-db-vault-role"
 
     resourcetier      = local.resourcetier
+    db_host_name      = "deadlinedb.service.consul"
     installers_bucket = "software.${var.bucket_extension}"
     deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
     deadline_version  = var.deadline_version

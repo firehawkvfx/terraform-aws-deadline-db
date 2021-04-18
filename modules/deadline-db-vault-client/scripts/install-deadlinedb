@@ -9,7 +9,7 @@ readonly DEFAULT_DBPORT="27100"
 readonly DEFAULT_PROXYPORT="4433"
 readonly DEFAULT_HTTPPORT="8080"
 readonly DEFAULT_DOWNLOAD_DIR="/var/tmp/downloads"
-readonly DEFAULT_DB_HOST_NAME="deadlinedb.service.consul"
+# readonly DEFAULT_DB_HOST_NAME="deadlinedb.service.consul"
 readonly DEFAULT_DEADLINE_PROXY_CERTIFICATE="Deadline10RemoteClient.pfx"
 readonly DEFAULT_DEADLINE_CLIENT_CERTIFICATE="Deadline10Client.pfx"
 readonly DEFAULT_MONGO_URL="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.6.19.tgz"
@@ -25,6 +25,7 @@ function print_usage {
   echo "Options:"
   echo
   echo -e "  --deadline-version\t\tThe version to download and install"
+  echo -e "  --db-host-name\t\tThis hostname / hostname of the deadline DB. Example: deadlinedb.service.consul"
   echo -e "  --installers-bucket\t\tAn alternate S3 Bucket to use if the Thinkbox S3 Bucket is missing the deadline installer version you require. It will also upload any new Deadline installer to this bucket for archival and reprocibility. Optional"
   echo -e "  --deadlineuser-name\t\tThe username to configure the deadline DB user for and install the software as this user. Optional. Default: $DEFAULT_DEADLINEUSER_NAME."
   echo -e "  --skip-certgen-during-db-install\t\tInstall DB without generating certificates.  Used for building images. Optional."
@@ -849,7 +850,7 @@ function options { # Not all defaults are available as args, however the script 
   local proxyport="$DEFAULT_PROXYPORT"
   local httpport="$DEFAULT_HTTPPORT"
   local download_dir="$DEFAULT_DOWNLOAD_DIR"
-  local db_host_name="$DEFAULT_DB_HOST_NAME"
+  # local db_host_name="$DEFAULT_DB_HOST_NAME"
   local deadline_proxy_certificate="$DEFAULT_DEADLINE_PROXY_CERTIFICATE"
   local deadline_client_certificate="$DEFAULT_DEADLINE_CLIENT_CERTIFICATE"
   local mongo_url="$DEFAULT_MONGO_URL"
@@ -871,6 +872,10 @@ function options { # Not all defaults are available as args, however the script 
         ;;
       --deadline-version)
         deadline_version="$2"
+        shift
+        ;;
+      --db-host-name)
+        db_host_name="$2"
         shift
         ;;
       --skip-certgen-during-db-install)
@@ -909,6 +914,7 @@ function options { # Not all defaults are available as args, however the script 
   done
 
   assert_not_empty "--deadline-version" "$deadline_version"
+  assert_not_empty "--db-host-name" "$db_host_name"
 
   # Implicit vars
   cert_org="Deadline10Installer"

@@ -64,7 +64,7 @@ function retry {
 
 ### Centos 7 fix: Failed dns lookup can cause sudo commands to slowdown
 if $(has_yum); then
-    hostname=$(hostname -s) 
+    hostname="${db_host_name}"
     echo "127.0.0.1   $hostname.${aws_internal_domain} $hostname" | tee -a /etc/hosts
     hostnamectl set-hostname $hostname.${aws_internal_domain} # Red hat recommends that the hostname uses the FQDN.  hostname -f to resolve the domain may not work at this point on boot, so we use a var.
     # systemctl restart network # we restart the network later, needed to update the host name
@@ -121,5 +121,5 @@ chmod u+x $installer_path
 # sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers
 
 # # generate certs after install test
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers --skip-certgen-during-db-install --post-certgen-db --skip-certgen-during-rcs-install --post-certgen-rcs
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-certgen-during-db-install --post-certgen-db --skip-certgen-during-rcs-install --post-certgen-rcs
 
