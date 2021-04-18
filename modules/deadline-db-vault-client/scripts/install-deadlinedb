@@ -926,7 +926,7 @@ function options { # Not all defaults are available as args, however the script 
   fi
   if [[ "$skip_install_packages" == "false" ]]; then
     get_ssl_gen_repo "$deadlineuser_name" "$skip_install_packages" # this repo contains the deadline script to generate certificates
-  if
+  fi
   # Install DB
   if [[ "$skip_install_db" == "false" ]]; then
     setup_directories_and_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificates_location"
@@ -965,6 +965,7 @@ function options { # Not all defaults are available as args, however the script 
   # Start the service and validate the configuration is working
   start_service_and_validate "$dbport"
   start_launcher # TODO we should validate this too
+
 }
 
 options "$@"
