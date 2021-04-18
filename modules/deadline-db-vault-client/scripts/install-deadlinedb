@@ -318,8 +318,11 @@ function generate_certs {
   # Alternate attempt at generating mongo_client.pem
   echo "...Generate Client Cert"
   python ssl_gen.py --client --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
-  # Create PEM key
 
+  # need to add x509 user
+  # https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/
+
+  # Create PEM key
 
   # # RCS proxy cert
   # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
@@ -352,6 +355,26 @@ function generate_certs {
   # stop service before updating config.
   sudo service Deadline10db stop
 
+  # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
+  x509_subject="$(openssl x509 -in "${deadline_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253)"
+  echo "subject:"
+  echo $x509_subject
+  echo "...Adding x509 User:"
+  LINE=$(cat <<END
+db.getSiblingDB("$external").runCommand(
+  {
+    createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
+    roles: [
+         { role: "readWrite", db: "test" },
+         { role: "userAdminAnyDatabase", db: "admin" }
+    ],
+    writeConcern: { w: "majority" , wtimeout: 5000 }
+  }
+)
+END
+)
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "'$LINE'"
+  
   # Configure Mongo : /opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"        "    mode:" " requireSSL"
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"      "    #CAFile:" "    CAFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
@@ -699,7 +722,6 @@ function options { # Not all defaults are available as args, however the script 
   deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
   deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
   deadline_installer_dir="$download_dir/$deadline_linux_installers_basename"
-  server_cert_basename="$db_host_name"
   deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
   mongo_installer_tgz="$download_dir/$(basename $mongo_url)"
   deadline_db_installer_filename="DeadlineRepository-${deadline_version}-linux-x64-installer.run"
