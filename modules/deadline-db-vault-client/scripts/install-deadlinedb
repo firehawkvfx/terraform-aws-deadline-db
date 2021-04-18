@@ -360,13 +360,28 @@ function generate_certs {
   echo "subject:"
   echo $x509_subject
   echo "...Adding x509 User:"
+#   LINE=$(cat <<END
+# db.getSiblingDB("\$external").runCommand(
+#   {
+#     createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
+#     roles: [
+#          { role: "readWrite", db: "test" },
+#          { role: "userAdminAnyDatabase", db: "admin" }
+#     ],
+#     writeConcern: { w: "majority" , wtimeout: 5000 }
+#   }
+# )
+# END
+# )
   LINE=$(cat <<END
 db.getSiblingDB("\$external").runCommand(
   {
     createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
     roles: [
          { role: "readWrite", db: "test" },
+         { role: "readWrite", db: "deadline10db" },
          { role: "userAdminAnyDatabase", db: "admin" }
+         
     ],
     writeConcern: { w: "majority" , wtimeout: 5000 }
   }
