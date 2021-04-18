@@ -356,19 +356,19 @@ function generate_certs {
   sudo service Deadline10db stop
 
   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
-  x509_subject="$(openssl x509 -in "${deadline_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253)"
+  x509_subject=$(openssl x509 -in "${deadline_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//')
   echo "subject:"
   echo $x509_subject
   echo "...Adding x509 User:"
   LINE=$(cat <<END
-db.getSiblingDB(\"$external\").runCommand(
+db.getSiblingDB("\$external").runCommand(
   {
-    createUser: \"OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client\",
+    createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
     roles: [
-         { role: \"readWrite\", db: \"test\" },
-         { role: \"userAdminAnyDatabase\", db: \"admin\" }
+         { role: "readWrite", db: "test" },
+         { role: "userAdminAnyDatabase", db: "admin" }
     ],
-    writeConcern: { w: \"majority\" , wtimeout: 5000 }
+    writeConcern: { w: "majority" , wtimeout: 5000 }
   }
 )
 END
