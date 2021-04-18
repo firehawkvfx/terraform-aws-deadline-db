@@ -33,27 +33,27 @@ resource "aws_security_group" "deadline_db_vault_client" {
   ingress {
     protocol    = "tcp"
     from_port   = 17000
-    to_port     = 17000
-    cidr_blocks = var.permitted_cidr_list
-    # security_groups = var.security_group_ids
-    description = "Launcher Listening Port"
-  }
-  ingress {
-    protocol    = "tcp"
-    from_port   = 17001
-    to_port     = 17001
-    cidr_blocks = var.permitted_cidr_list
-    # security_groups = var.security_group_ids
-    description = "Deadline Auto Config Port"
-  }
-  ingress {
-    protocol    = "tcp"
-    from_port   = 17003
     to_port     = 17003
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
-    description = "Deadline Worker / Slave Startup Port"
+    description = "Launcher Listening Port, Deadline Auto Config Port, Deadline Worker / Slave Startup Port"
   }
+  # ingress {
+  #   protocol    = "tcp"
+  #   from_port   = 17001
+  #   to_port     = 17001
+  #   cidr_blocks = var.permitted_cidr_list
+  #   # security_groups = var.security_group_ids
+  #   description = "Deadline Auto Config Port"
+  # }
+  # ingress {
+  #   protocol    = "tcp"
+  #   from_port   = 17003
+  #   to_port     = 17003
+  #   cidr_blocks = var.permitted_cidr_list
+  #   # security_groups = var.security_group_ids
+  #   description = "Deadline Worker / Slave Startup Port"
+  # }
   ingress {
     protocol    = "tcp"
     from_port   = 27100
