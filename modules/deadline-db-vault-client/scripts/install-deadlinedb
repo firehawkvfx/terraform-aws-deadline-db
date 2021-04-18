@@ -441,9 +441,9 @@ function generate_certs_for_clients {
 
   # Certs Permissions
   sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
-  sudo chmod u=r,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
   # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
-  sudo chmod o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
+  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
   # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
 
   # # generate certs for RCS:
