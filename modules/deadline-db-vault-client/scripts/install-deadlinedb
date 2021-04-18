@@ -923,9 +923,10 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$skip_download_installers" == "false" ]]; then
     download_mongo "$mongo_installer_tgz" "$mongo_url"
     download_deadline "$deadline_linux_installers_tar" "$deadline_version" "$deadline_linux_installers_filename" "$installers_bucket" "$deadline_installer_dir"
-    get_ssl_gen_repo "$deadlineuser_name" "$skip_install_packages"
   fi
-  
+  if [[ "$skip_install_packages" == "false" ]]; then
+    get_ssl_gen_repo "$deadlineuser_name" "$skip_install_packages" # this repo contains the deadline script to generate certificates
+  if
   # Install DB
   if [[ "$skip_install_db" == "false" ]]; then
     setup_directories_and_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificates_location"
