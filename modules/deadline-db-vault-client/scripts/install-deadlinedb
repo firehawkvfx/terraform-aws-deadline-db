@@ -411,8 +411,12 @@ function generate_certs_for_clients {
   echo "...Generate CA"
   python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
   # Server Cert
-  echo "...Generate Host PFX Cert: $server_cert_basename"
-  python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
+  echo "...Generate Server Cert"
+  python ssl_gen.py --server --cert-name "$server_cert_basename"
+  cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
+
+  echo "...Generate Host PFX Cert: $server_cert_basename" # should this be converted from the above instead?
+  python ssl_gen.py --pfx --cert-name "$server_cert_basename"
 
   # cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
 
