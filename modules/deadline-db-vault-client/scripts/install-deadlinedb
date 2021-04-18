@@ -654,10 +654,10 @@ function install_rcs_no_generate_certs {
   --tlsport $proxyport \
   --enabletls true \
   --tlscertificates existing  \
-  # --generatedcertdir "${deadline_client_certificates_location}/" \
   --slavestartup false \
   --proxyrootdir $deadline_proxy_root_dir \
   --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
+  # --generatedcertdir "${deadline_client_certificates_location}/" \
   # --dbsslpassword avaultpassword \
   # --clientcert_pass avaultpassword \
   # --proxycertificatepassword avaultpassword
