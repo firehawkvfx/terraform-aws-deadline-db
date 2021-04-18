@@ -291,6 +291,8 @@ function generate_certs {
   local -r deadline_client_certificate_basename="$6"
   local -r deadline_client_certificate="$7"
   local -r skip_install_packages="$8"
+  local -r deadline_version="$9"
+  local -r deadline_major_version="$(echo $deadline_version | awk -F '.' '{print $1}')"
   local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
 
@@ -308,38 +310,18 @@ function generate_certs {
   # Server Cert
   echo "...Generate Server Cert"
   python ssl_gen.py --server --cert-name "$server_cert_basename"
-  # Create PEM key - undocumented by Thinkbox
   cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
-  # mongo client pem file is undocumented.  Try this.
-  # python ssl_gen.py --server --cert-name mongo_client
-  # # Create PEM key - undocumented by Thinkbox
-  # cat "${ssl_keygen_path}/mongo_client.crt" "${ssl_keygen_path}/mongo_client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem"
 
-  # Alternate attempt at generating mongo_client.pem
   echo "...Generate Client Cert"
   python ssl_gen.py --client --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
 
-  # need to add x509 user
-  # https://docs.mongodb.com/manual/tutorial/configure-x509-client-authentication/
-
-  # Create PEM key
-
-  # # RCS proxy cert
-  # python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
-  # python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename"
-  # Remote Client Cert ? not sure how this works yet, sinc RCS is supposed to create that.
   echo "...Generate Client pfx"
-  # python ssl_gen.py --client --cert-name $deadline_client_certificate_basename --cert-ou "$deadline_client_certificate_basename" # The deadline install by default produces a different ou for the client cert than the ca.  We match that here.
   python ssl_gen.py --pfx --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename"
-  # cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
-  echo "...Create mongo_client.pem"
-  cat "${ssl_keygen_path}/Deadline10Client.crt" "${ssl_keygen_path}/Deadline10Client.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
-  # openssl pkcs12 -in "${ssl_keygen_path}/Deadline10Client.pfx" -out "${ssl_keygen_path}/mongo_client.pem" -nodes
+  echo "...Create mongo_client.pem from $deadline_client_certificate_basename.crt and $deadline_client_certificate_basename.key"
+  cat "${ssl_keygen_path}/${deadline_client_certificate_basename}.crt" "${ssl_keygen_path}/${deadline_client_certificate_basename}.key" | sudo tee "${ssl_keygen_path}/mongo_client.pem" # Is this being produced correctly?
 
   echo "...Relocate certs"
-  # sudo rm -frv $deadline_certificates_location/* # Remove invalid previous certs if present
-
   sudo mv -v "${ssl_keygen_path}/ca.crt" "$deadline_certificates_location"
   sudo mv -v "${ssl_keygen_path}/$deadline_client_certificate" "$deadline_certificates_location"
   sudo mv -v "${ssl_keygen_path}/${server_cert_basename}.pem" "$deadline_certificates_location"
@@ -352,42 +334,27 @@ function generate_certs {
   sudo chmod o-rwx "${deadline_certificates_location}/${server_cert_basename}.pem"
   sudo chmod o-rwx "${deadline_certificates_location}/mongo_client.pem"
 
-  # stop service before updating config.
-  sudo service Deadline10db stop
+  sudo service Deadline10db stop # stop service before updating config.
 
   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
-  x509_subject=$(openssl x509 -in "${deadline_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//')
-  echo "subject:"
-  echo $x509_subject
-  echo "...Adding x509 User:"
-#   LINE=$(cat <<END
-# db.getSiblingDB("\$external").runCommand(
-#   {
-#     createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
-#     roles: [
-#          { role: "readWrite", db: "test" },
-#          { role: "userAdminAnyDatabase", db: "admin" }
-#     ],
-#     writeConcern: { w: "majority" , wtimeout: 5000 }
-#   }
-# )
-# END
-# )
+  x509_subject=$(openssl x509 -in "${deadline_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
+  echo "subject: $x509_subject"
+  
   LINE=$(cat <<END
 db.getSiblingDB("\$external").runCommand(
   {
-    createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
+    createUser: "${x509_subject}",
     roles: [
          { role: "readWrite", db: "test" },
-         { role: "readWrite", db: "deadline10db" },
+         { role: "readWrite", db: "deadline${deadline_major_version}db" },
          { role: "userAdminAnyDatabase", db: "admin" }
-         
     ],
     writeConcern: { w: "majority" , wtimeout: 5000 }
   }
 )
 END
 )
+  echo "...Adding x509 User:"
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
   
   # Configure Mongo : /opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf
@@ -397,16 +364,16 @@ END
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    #PEMKeyFile:" "    PEMKeyFile: ERROR_DURING_REPLACEMENT" # if you can read this result, something went wrong
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"  "    PEMKeyFile:" " $deadline_certificates_location/$server_cert_basename.pem"
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf" "  authorization:" " enabled" # ? not sure what this should be
+
+  # We modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
+  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
+  # Becomes:
+  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "/opt/Thinkbox/DeadlineDatabase10/certs/mongo_client.pem" --sslCAFile "/opt/Thinkbox/DeadlineDatabase10/certs/ca.crt" --authenticationDatabase '$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
   LINE=$(cat <<END
 exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo \"deadline10db\" --host \"deadlinedb.service.consul\" --port \"27100\" --ssl --sslPEMKeyFile \"${deadline_certificates_location}/mongo_client.pem\" --sslCAFile \"${deadline_certificates_location}/ca.crt\" --authenticationDatabase '\$external' --authenticationMechanism \"MONGODB-X509\" --username \"OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client\" \"\$@\"
 END
 )
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"  "exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo" "$LINE"
-
-  # we need to modify deadline_mongo script to use certs: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
-  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" "$@"
-  # Becomes:
-  # exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27100" --ssl --sslPEMKeyFile "/opt/Thinkbox/DeadlineDatabase10/certs/mongo_client.pem" --sslCAFile "/opt/Thinkbox/DeadlineDatabase10/certs/ca.crt" --authenticationDatabase '$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
 }
 
 
@@ -656,10 +623,6 @@ function start_service_and_validate {
 # StorageAccess=Database
 # CACertificatePath=
 
-
-
-# /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --sslPEMKeyPassword "avaultpassword" --eval 'printjson(db.getCollectionNames())'
-
 function set_hostname {
   db_host_name="$1"
   echo "...Set hostname"
@@ -760,7 +723,7 @@ function options { # Not all defaults are available as args, however the script 
     install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
   fi
   if [[ "$post_certgen" == "true" ]]; then
-    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages"
+    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version"
   fi
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
   
