@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This installs certificates with the DB.
+# This installs certificates with the DB or generate certs after DB for RCS.
 
 set -e
 
@@ -281,7 +281,20 @@ function install_db_without_certs {
   echo "Completed DB install."
 }
 
-function generate_certs {
+function get_ssl_gen_repo {
+  local -r deadlineuser_name="$1"
+  local -r skip_install_packages="$2"
+  local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
+
+  # Generate Certs - see https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/proxy-sslgen.html
+  if [[ "$skip_install_packages" == "false" ]]; then
+    sudo apt-get install -y python-openssl
+  fi
+  sudo rm -frv "$ssl_keygen_base_path" # if this is a repeated install, clear the keys
+  git clone https://github.com/ThinkboxSoftware/SSLGeneration.git "$ssl_keygen_base_path"
+}
+
+function generate_certs_for_db_and_rcs {
   echo "...Generate certificates."
   local -r deadlineuser_name="$1"
   local -r cert_org="$2"
@@ -292,16 +305,12 @@ function generate_certs {
   local -r deadline_client_certificate="$7"
   local -r skip_install_packages="$8"
   local -r deadline_version="$9"
+  local -r deadline_proxy_certificate="${10}"
   local -r deadline_major_version="$(echo $deadline_version | awk -F '.' '{print $1}')"
   local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
+  local -r deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
 
-  # Generate Certs - see https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/proxy-sslgen.html
-  if [[ "$skip_install_packages" == "false" ]]; then
-    sudo apt-get install -y python-openssl
-  fi
-  sudo rm -frv "$ssl_keygen_base_path" # if this is a repeated install, clear the keys
-  git clone https://github.com/ThinkboxSoftware/SSLGeneration.git "$ssl_keygen_base_path"
   cd /home/$deadlineuser_name/Downloads/SSLGeneration
 
   # CA
@@ -315,7 +324,7 @@ function generate_certs {
   echo "...Generate Client Cert"
   python ssl_gen.py --client --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
 
-  echo "...Generate Client pfx"
+  echo "...Generate Client pfx" # TODO: This is possibly not used, need to investigate!
   python ssl_gen.py --pfx --cert-name "$deadline_client_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_client_certificate_basename"
 
   echo "...Create mongo_client.pem from $deadline_client_certificate_basename.crt and $deadline_client_certificate_basename.key"
@@ -374,6 +383,91 @@ exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo \"deadline10db
 END
 )
   replace_line "/opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"  "exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo" "$LINE"
+}
+
+function generate_certs_for_clients {
+  echo "...Generate certificates."
+  local -r deadlineuser_name="$1"
+  local -r cert_org="$2"
+  local -r rcs_cert_ou="$3"
+  local -r server_cert_basename="$4"
+  local -r deadline_client_certificates_location="$5"
+  local -r deadline_client_certificate_basename="$6"
+  local -r deadline_client_certificate="$7"
+  local -r skip_install_packages="$8"
+  local -r deadline_version="$9"
+  local -r deadline_proxy_certificate="${10}"
+  local -r deadline_major_version="$(echo $deadline_version | awk -F '.' '{print $1}')"
+  local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
+  local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
+  local -r deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
+  
+  cd /home/$deadlineuser_name/Downloads/SSLGeneration
+
+  echo "...Clear any previous keys"
+  rm -frv ${ssl_keygen_path}/*
+  
+  # CA
+  echo "...Generate CA"
+  python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
+  # Server Cert
+  # echo "...Generate Server Cert"
+  python ssl_gen.py --pfx --server --cert-name "$server_cert_basename"
+
+  # cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
+
+  # openssl pkcs12 -in ${basename}.pfx -out ${basename}.pem -clcerts
+  # openssl pkcs12 -in ${basename}.pfx -out root.pem -cacerts
+
+  # echo "...Generate hostname pfx: $server_cert_basename" # TODO: This is possibly not used, need to investigate!
+  # python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
+
+  echo "...Generate Client Cert: $deadline_proxy_certificate_basename"
+  python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
+
+  echo "...Relocate certs"
+  sudo mv -v "${ssl_keygen_path}/ca.crt" "$deadline_client_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/$deadline_client_certificate" "$deadline_client_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/${server_cert_basename}.pem" "$deadline_client_certificates_location"
+  sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_client_certificates_location"
+
+  # Certs Permissions
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
+  sudo chmod u=r,g=r,o=r "${deadline_client_certificates_location}/${deadline_client_certificate}"
+  sudo chmod o-rwx ${deadline_client_certificates_location}/$deadline_client_certificate
+  sudo chmod o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
+  sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+
+  # # generate certs for RCS:
+  # # CN = CA, O = Deadline10Installer, OU = Deadline10ConnServer
+  # echo "...Generate CA"
+  # python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$cert_ou"
+
+  # echo "...Generate Proxy pfx"
+  # python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_proxy_certificate_basename"
+
+#   sudo service Deadline10db stop # stop service before updating config.
+
+#   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
+#   x509_subject=$(openssl x509 -in "${deadline_client_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
+#   echo "subject: $x509_subject"
+  
+#   LINE=$(cat <<END
+# db.getSiblingDB("\$external").runCommand(
+#   {
+#     createUser: "${x509_subject}",
+#     roles: [
+#          { role: "readWrite", db: "test" },
+#          { role: "readWrite", db: "deadline${deadline_major_version}db" },
+#          { role: "userAdminAnyDatabase", db: "admin" }
+#     ],
+#     writeConcern: { w: "majority" , wtimeout: 5000 }
+#   }
+# )
+# END
+# )
+#   echo "...Adding x509 User:"
+#   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
 }
 
 
@@ -460,7 +554,108 @@ function post_db_install_permissions {
   sudo service Deadline10db start
 }
 
-function install_rcs_with_certs {
+function install_rcs_generate_certs {
+  local -r deadline_installer_dir="$1"
+  local -r deadline_client_installer_filename="$2"
+  local -r deadline_certificates_location="$3"
+  local -r deadline_client_certificates_location="$4"
+  local -r deadline_client_certificate="$5"
+  local -r deadline_proxy_certificate="$6"
+  local -r deadlineuser_name="$7"
+  local -r httpport="$8"
+  local -r proxyport="$9"
+  local -r deadline_proxy_root_dir="${10}"
+  local -r skip_install_packages="${11}"
+
+  # Directories and Permissions
+  if [[ "$skip_install_packages" == "false" ]]; then
+    echo "...Install packages for Deadline RCS"
+    sudo apt-get install -y xdg-utils
+    sudo apt-get install -y lsb # required for render nodes as well
+  fi
+  sudo mkdir -p /usr/share/desktop-directories
+
+  echo "...Installing Deadline Client: RCS with certs"
+  # Install Client:
+  # Deadline RCS
+  sudo $deadline_installer_dir/$deadline_client_installer_filename \
+  --mode unattended \
+  --launcherdaemon true \
+  --enable-components proxyconfig \
+  --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --debuglevel 2 \
+  --prefix /opt/Thinkbox/Deadline10 \
+  --connectiontype Repository \
+  --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
+  --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --licensemode UsageBased \
+  --daemonuser "$deadlineuser_name" \
+  --connserveruser "$deadlineuser_name" \
+  --httpport $httpport \
+  --tlsport $proxyport \
+  --enabletls true \
+  --tlscertificates generate  \
+  --generatedcertdir "${deadline_client_certificates_location}/" \
+  --slavestartup false \
+  --proxyrootdir $deadline_proxy_root_dir \
+  --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
+  # --dbsslpassword avaultpassword \
+  # --clientcert_pass avaultpassword \
+  # --proxycertificatepassword avaultpassword
+}
+
+function install_rcs_no_generate_certs {
+  local -r deadline_installer_dir="$1"
+  local -r deadline_client_installer_filename="$2"
+  local -r deadline_certificates_location="$3"
+  local -r deadline_client_certificates_location="$4"
+  local -r deadline_client_certificate="$5"
+  local -r deadline_proxy_certificate="$6"
+  local -r deadlineuser_name="$7"
+  local -r httpport="$8"
+  local -r proxyport="$9"
+  local -r deadline_proxy_root_dir="${10}"
+  local -r skip_install_packages="${11}"
+
+  # Directories and Permissions
+  if [[ "$skip_install_packages" == "false" ]]; then
+    echo "...Install packages for Deadline RCS"
+    sudo apt-get install -y xdg-utils
+    sudo apt-get install -y lsb # required for render nodes as well
+  fi
+  sudo mkdir -p /usr/share/desktop-directories
+
+  echo "...Installing Deadline Client: RCS with certs"
+  # Install Client:
+  # Deadline RCS
+  sudo $deadline_installer_dir/$deadline_client_installer_filename \
+  --mode unattended \
+  --launcherdaemon true \
+  --enable-components proxyconfig \
+  --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --cacert "${deadline_certificates_location}/ca.crt" \
+  --debuglevel 2 \
+  --prefix /opt/Thinkbox/Deadline10 \
+  --connectiontype Repository \
+  --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
+  --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
+  --licensemode UsageBased \
+  --daemonuser "$deadlineuser_name" \
+  --connserveruser "$deadlineuser_name" \
+  --httpport $httpport \
+  --tlsport $proxyport \
+  --enabletls true \
+  --tlscertificates existing  \
+  # --generatedcertdir "${deadline_client_certificates_location}/" \
+  --slavestartup false \
+  --proxyrootdir $deadline_proxy_root_dir \
+  --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
+  # --dbsslpassword avaultpassword \
+  # --clientcert_pass avaultpassword \
+  # --proxycertificatepassword avaultpassword
+}
+
+function install_rcs_generate_certs {
   local -r deadline_installer_dir="$1"
   local -r deadline_client_installer_filename="$2"
   local -r deadline_certificates_location="$3"
@@ -634,6 +829,7 @@ function options { # Not all defaults are available as args, however the script 
   local installers_bucket=""
   local deadlineuser_name="$DEFAULT_DEADLINEUSER_NAME"
   local skip_certgen_during_install="false"
+  local skip_certgen_during_rcs_install="false"
   local post_certgen="false"
   local dbport="$DEFAULT_DBPORT"
   local proxyport="$DEFAULT_PROXYPORT"
@@ -665,6 +861,9 @@ function options { # Not all defaults are available as args, however the script 
       --skip-certgen-during-install)
         skip_certgen_during_install="true"
         ;;
+      --skip-certgen-during-rcs-install)
+        skip_certgen_during_rcs_install="true"
+        ;;
       --post-certgen)
         post_certgen="true"
         ;;
@@ -693,6 +892,7 @@ function options { # Not all defaults are available as args, however the script 
   # Implicit vars
   cert_org="Deadline10Installer"
   cert_ou="Deadline10MongoDB"
+  rcs_cert_ou="Deadline10ConnServer"
   server_cert_basename="$db_host_name"
   deadline_proxy_root_dir="$db_host_name:$proxyport"
   deadline_client_certificate_basename="${deadline_client_certificate%.*}"
@@ -700,7 +900,7 @@ function options { # Not all defaults are available as args, however the script 
   deadline_linux_installers_filename="$(basename $deadline_linux_installers_tar)"
   deadline_linux_installers_basename="${deadline_linux_installers_filename%.*}"
   deadline_installer_dir="$download_dir/$deadline_linux_installers_basename"
-  deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
+  # deadline_proxy_certificate_basename="${deadline_proxy_certificate%.*}"
   mongo_installer_tgz="$download_dir/$(basename $mongo_url)"
   deadline_db_installer_filename="DeadlineRepository-${deadline_version}-linux-x64-installer.run"
   deadline_client_installer_filename="DeadlineClient-${deadline_version}-linux-x64-installer.run"
@@ -723,7 +923,11 @@ function options { # Not all defaults are available as args, however the script 
     install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
   fi
   if [[ "$post_certgen" == "true" ]]; then
-    generate_certs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version"
+    get_ssl_gen_repo "$deadlineuser_name" "$skip_install_packages"
+    generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate"
+    if [[ "$skip_certgen_during_rcs_install" == "true" ]]; then # RCS can use externally generated certificates
+      generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate"
+    fi
   fi
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
   
@@ -731,7 +935,11 @@ function options { # Not all defaults are available as args, however the script 
   cat /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
   
   # Install RCS
-  install_rcs_with_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+  if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
+    install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+  else
+    install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+  fi
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen" == "true" ]]; then
     configure_auth "$deadlineuser_name"
@@ -743,4 +951,5 @@ function options { # Not all defaults are available as args, however the script 
 }
 
 options "$@"
+
 
