@@ -361,19 +361,19 @@ function generate_certs {
   echo $x509_subject
   echo "...Adding x509 User:"
   LINE=$(cat <<END
-db.getSiblingDB("$external").runCommand(
+db.getSiblingDB(\"$external\").runCommand(
   {
-    createUser: "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client",
+    createUser: \"OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client\",
     roles: [
-         { role: "readWrite", db: "test" },
-         { role: "userAdminAnyDatabase", db: "admin" }
+         { role: \"readWrite\", db: \"test\" },
+         { role: \"userAdminAnyDatabase\", db: \"admin\" }
     ],
-    writeConcern: { w: "majority" , wtimeout: 5000 }
+    writeConcern: { w: \"majority\" , wtimeout: 5000 }
   }
 )
 END
 )
-  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "'$LINE'"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
   
   # Configure Mongo : /opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf
   ensure_value "/opt/Thinkbox/DeadlineDatabase10/mongo/data/config.conf"        "    mode:" " requireSSL"
