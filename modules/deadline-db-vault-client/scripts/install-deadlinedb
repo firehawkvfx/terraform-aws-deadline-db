@@ -303,7 +303,7 @@ function start_service_and_validate {
   # show open ports
   netstat -lnt
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval 'printjson(db.getCollectionNames())'
-  printf "\n\nDeadline config Succesfully established a connection.\n\n"
+  printf "\n\nDeadline succesfully established a connection with the DB.\n\n"
 }
 
 function start_launcher {
@@ -449,16 +449,10 @@ function generate_certs_for_clients {
   echo "...Generate Host PFX Cert: $server_cert_basename" # should this be converted from the above instead?
   python ssl_gen.py --pfx --cert-name "$server_cert_basename"
 
-  # cat "${ssl_keygen_path}/${server_cert_basename}.crt" "${ssl_keygen_path}/${server_cert_basename}.key" | sudo tee "${ssl_keygen_path}/${server_cert_basename}.pem"
-
-  # openssl pkcs12 -in ${basename}.pfx -out ${basename}.pem -clcerts
-  # openssl pkcs12 -in ${basename}.pfx -out root.pem -cacerts
-
-  # echo "...Generate hostname pfx: $server_cert_basename" # TODO: This is possibly not used, need to investigate!
-  # python ssl_gen.py --pfx --cert-name "$server_cert_basename" --cert-org "$cert_org" --cert-ou "$rcs_cert_ou"
-
   echo "...Generate Client Cert: $deadline_proxy_certificate_basename"
   python ssl_gen.py --client --cert-name "$deadline_proxy_certificate_basename"
+  # PEM key is required to extract subject
+  cat "${ssl_keygen_path}/${deadline_proxy_certificate_basename}.crt" "${ssl_keygen_path}/${deadline_proxy_certificate_basename}.key" | sudo tee "${ssl_keygen_path}/${deadline_proxy_certificate_basename}.pem"
 
   echo "...Generate Client PFX Cert: $deadline_proxy_certificate_basename"
   python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" # We need this subject according to the result in deadline_mongo with a standard install "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client"
@@ -480,9 +474,8 @@ function generate_certs_for_clients {
 
   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
   x509_subject=$(openssl x509 -in "${ssl_keygen_path}/${server_cert_basename}.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
-  echo "subject: $x509_subject"
-  
-  LINE=$(cat <<END
+  echo "Add user subject: $x509_subject"
+  LINE1=$(cat <<END
 db.getSiblingDB("\$external").runCommand(
   {
     createUser: "${x509_subject}",
@@ -496,10 +489,28 @@ db.getSiblingDB("\$external").runCommand(
 )
 END
 )
+  x509_subject=$(openssl x509 -in "${ssl_keygen_path}/${deadline_proxy_certificate_basename}.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
+  echo "Add user subject: $x509_subject"
+  LINE2=$(cat <<END
+db.getSiblingDB("\$external").runCommand(
+  {
+    createUser: "${x509_subject}",
+    roles: [
+         { role: "readWrite", db: "deadline${deadline_major_version}db" },
+    ],
+    writeConcern: { w: "majority" , wtimeout: 5000 }
+  }
+)
+END
+)
+
   start_service_and_validate "$dbport"
-  echo "...Adding x509 User for RCS:"
-  # sudo service Deadline10db restart
-  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
+  echo "...Adding x509 Admin User for RCS: $LINE1"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE1"
+  echo "...Adding x509 Remote Client User for RCS: $LINE2"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE2"
+
+  # TODO need to add remote user for RCS
 
   sudo service Deadline10db restart
 }
