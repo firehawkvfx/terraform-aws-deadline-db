@@ -446,36 +446,30 @@ function generate_certs_for_clients {
   sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
   # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
 
-  # # generate certs for RCS:
-  # # CN = CA, O = Deadline10Installer, OU = Deadline10ConnServer
-  # echo "...Generate CA"
-  # python ssl_gen.py --ca --cert-org "$cert_org" --cert-ou "$cert_ou"
+  sudo service Deadline10db start # stop service before updating config.
 
-  # echo "...Generate Proxy pfx"
-  # python ssl_gen.py --pfx --cert-name "$deadline_proxy_certificate_basename" --cert-org "$cert_org" --cert-ou "$deadline_proxy_certificate_basename"
-
-#   sudo service Deadline10db stop # stop service before updating config.
-
-#   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
-#   x509_subject=$(openssl x509 -in "${deadline_client_certificates_location}/mongo_client.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
-#   echo "subject: $x509_subject"
+  # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
+  x509_subject=$(openssl x509 -in "${ssl_keygen_path}/${server_cert_basename}.pem" -inform PEM -subject -nameopt RFC2253 | head -1 | sed 's/^.\{8\}//') # extract subject from cert for user name.
+  echo "subject: $x509_subject"
   
-#   LINE=$(cat <<END
-# db.getSiblingDB("\$external").runCommand(
-#   {
-#     createUser: "${x509_subject}",
-#     roles: [
-#          { role: "readWrite", db: "test" },
-#          { role: "readWrite", db: "deadline${deadline_major_version}db" },
-#          { role: "userAdminAnyDatabase", db: "admin" }
-#     ],
-#     writeConcern: { w: "majority" , wtimeout: 5000 }
-#   }
-# )
-# END
-# )
-#   echo "...Adding x509 User:"
-#   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
+  LINE=$(cat <<END
+db.getSiblingDB("\$external").runCommand(
+  {
+    createUser: "${x509_subject}",
+    roles: [
+         { role: "readWrite", db: "test" },
+         { role: "readWrite", db: "deadline${deadline_major_version}db" },
+         { role: "userAdminAnyDatabase", db: "admin" }
+    ],
+    writeConcern: { w: "majority" , wtimeout: 5000 }
+  }
+)
+END
+)
+  echo "...Adding x509 User for RCS:"
+  sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
+
+  sudo service Deadline10db restart
 }
 
 
