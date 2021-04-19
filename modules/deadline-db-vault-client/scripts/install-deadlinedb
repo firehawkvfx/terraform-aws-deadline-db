@@ -291,12 +291,12 @@ function start_db_service_and_validate {
 
   echo "..Restart Deadline10db service"
   sudo service Deadline10db restart # Now that config is done start the DB and the launcher.
-  echo "...Waiting for port: $dbport"
+  echo "...Waiting for DB port: $dbport"
   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
   
   echo "..Restart Deadline10db service" # Sometimes, this is required twice for unknown reasons.
   sudo service Deadline10db restart
-  echo "...Waiting for port: $dbport"
+  echo "...Waiting for DB port: $dbport"
   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
 
   # sudo service deadline10launcher restart
@@ -307,11 +307,16 @@ function start_db_service_and_validate {
 }
 
 function start_launcher {
-  local -r proxyport="$1"
+  local -r dbport="$1"
+  local -r proxyport="$2"
+
+  echo "...Waiting for DB port: $dbport"
+  while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$dbport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
   sudo service deadline10launcher restart
-  echo "...Waiting for port: $proxyport"
+  sleep 1
+  sudo service deadline10launcher restart # after configuring new certs for some reason we need to restart twice
+  echo "...Waiting for RCS port: $proxyport"
   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$proxyport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
-  sudo service deadline10launcher restart
 }
 
 function get_ssl_gen_repo {
@@ -1012,7 +1017,7 @@ function options { # Not all defaults are available as args, however the script 
 
   # Start the service and validate the configuration is working
   start_db_service_and_validate "$dbport"
-  start_launcher "$proxyport" # TODO we should validate this too
+  start_launcher "$dbport" "$proxyport" # TODO we should validate this too
 
 }
 
