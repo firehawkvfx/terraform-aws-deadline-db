@@ -307,6 +307,10 @@ function start_db_service_and_validate {
 }
 
 function start_launcher {
+  local -r proxyport="$1"
+  sudo service deadline10launcher restart
+  echo "...Waiting for port: $proxyport"
+  while ! timeout 1 bash -c "echo > /dev/tcp/localhost/$proxyport"; do sleep 10; done # see alternatives https://unix.stackexchange.com/
   sudo service deadline10launcher restart
 }
 
@@ -1008,7 +1012,7 @@ function options { # Not all defaults are available as args, however the script 
 
   # Start the service and validate the configuration is working
   start_db_service_and_validate "$dbport"
-  start_launcher # TODO we should validate this too
+  start_launcher "$proxyport" # TODO we should validate this too
 
 }
 
