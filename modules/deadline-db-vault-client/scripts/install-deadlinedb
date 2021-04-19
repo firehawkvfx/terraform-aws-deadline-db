@@ -335,6 +335,7 @@ function generate_certs_for_db_and_rcs {
   local -r skip_install_packages="$8"
   local -r deadline_version="$9"
   local -r deadline_proxy_certificate="${10}"
+  local -r dbport="${11}"
   local -r deadline_major_version="$(echo $deadline_version | awk -F '.' '{print $1}')"
   local -r ssl_keygen_base_path="${HOME}Downloads/SSLGeneration"
   local -r ssl_keygen_path="$ssl_keygen_base_path/keys"
@@ -388,6 +389,7 @@ db.getSiblingDB("\$external").runCommand(
 )
 END
 )
+  start_db_service_and_validate "$dbport"
   echo "...Adding x509 User:"
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE"
   
@@ -993,12 +995,12 @@ function options { # Not all defaults are available as args, however the script 
 
   # Generate certs seperately
   if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
-    generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate"
+    generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
   fi
   if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
     generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
   fi
-  
+
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen_db" == "true" ]]; then
     configure_auth "$deadlineuser_name"
