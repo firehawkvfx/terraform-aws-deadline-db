@@ -959,7 +959,7 @@ function options { # Not all defaults are available as args, however the script 
       install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
     fi
   fi
-  
+
   # cert gen has been tested to work at this point here.
 
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
@@ -981,6 +981,8 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
     generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
   fi
+
+  post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location" # check permissions again.
 
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen_db" == "true" ]]; then
