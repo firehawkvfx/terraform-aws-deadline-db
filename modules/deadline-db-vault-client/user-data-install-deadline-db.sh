@@ -121,5 +121,5 @@ chmod u+x $installer_path
 # sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers
 
 # # generate certs after install test
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-certgen-during-db-install --post-certgen-db --skip-certgen-during-rcs-install --post-certgen-rcs
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
 
