@@ -743,6 +743,7 @@ function options { # Not all defaults are available as args, however the script 
   local skip_download_installers="false"
   local skip_install_packages="false"
   local skip_install_db="false"
+  local skip_install_rcs="false"
   local skip_install_validation="false"
 
   while [[ $# > 0 ]]; do
@@ -773,6 +774,9 @@ function options { # Not all defaults are available as args, however the script 
         ;;
       --skip-install-db)
         skip_install_db="true"
+        ;;
+      --skip-install-rcs)
+        skip_install_rcs="true"
         ;;
       --post-certgen-db)
         post_certgen_db="true"
@@ -849,13 +853,16 @@ function options { # Not all defaults are available as args, however the script 
   fi
 
   # Install RCS
-  if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
-    install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
-    client_certificate_permissions "$deadlineuser_name" "$deadline_client_certificates_location" "$deadline_proxy_certificate_basename" "$server_cert_basename"
-  else
-    install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages" "$server_cert_basename"
+  if [[ "$skip_install_rcs" == "false" ]]; then
+    if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
+      install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+      client_certificate_permissions "$deadlineuser_name" "$deadline_client_certificates_location" "$deadline_proxy_certificate_basename" "$server_cert_basename"
+    else
+      install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages" "$server_cert_basename"
+    fi
+    configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   fi
-
+  
   # Generate certs seperately
   if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
     generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
@@ -863,7 +870,6 @@ function options { # Not all defaults are available as args, however the script 
   fi
   if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
     generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
-    configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   fi
 
   # Start the service and validate the configuration is working.  This can be done once certs are installed.
