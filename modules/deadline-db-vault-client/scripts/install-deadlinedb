@@ -543,6 +543,8 @@ function client_certificate_permissions {
   sudo chmod u+rX,g+rX,o-rwx $deadline_client_certificates_location
 
   sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
+  sudo chmod u=wr,g=r,o-rwx $deadline_client_certificates_location/*
+  sudo chmod u=wr,g=r,o=r "${deadline_client_certificates_location}/ca.crt"
   sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
   sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
 }
@@ -554,6 +556,8 @@ function post_db_install_permissions {
   # finalize permissions post install:
   sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/
   sudo chmod u+rX,g+rX,o-rwx /opt/Thinkbox/
+
+  sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineDatabase10
 
   sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10
   sudo chmod -R u=rX,g=rX,o-rwx /opt/Thinkbox/DeadlineRepository10
@@ -700,11 +704,6 @@ function configure_deadline {
   ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "ProxyRoot0=" "$deadline_proxy_root_dir;$deadline_client_certificates_location/$deadline_proxy_certificate"
   ensure_value "/var/lib/Thinkbox/Deadline10/deadline.ini" "NetworkRoot0=" "/opt/Thinkbox/DeadlineRepository10/;$deadline_certificates_location/$deadline_client_certificate"
 
-  # finalize permissions post install:
-  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineDatabase10
-  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/certs/*
-  sudo chmod u=wr,g=r,o-rwx /opt/Thinkbox/certs/*
-  sudo chmod u=wr,g=r,o=r /opt/Thinkbox/certs/ca.crt
 }
 
 function configure_auth {
@@ -862,7 +861,7 @@ function options { # Not all defaults are available as args, however the script 
     fi
     configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   fi
-  
+
   # Generate certs seperately
   if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
     generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
