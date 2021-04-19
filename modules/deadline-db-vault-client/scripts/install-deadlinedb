@@ -285,7 +285,7 @@ function install_db_without_certs {
   echo "Completed DB install."
 }
 
-function start_service_and_validate {
+function start_db_service_and_validate {
   local -r dbport="$1"
   echo "...Validating.  Ensure a connection with the database can be established with the configuration."
 
@@ -366,12 +366,8 @@ function generate_certs_for_db_and_rcs {
   sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_certificates_location"
 
   # Certs Permissions
-  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
-  sudo chmod u=r,g=r,o=r "${deadline_certificates_location}/${deadline_client_certificate}"
-  sudo chmod o-rwx ${deadline_certificates_location}/$deadline_client_certificate
-  sudo chmod o-rwx "${deadline_certificates_location}/${server_cert_basename}.pem"
-  sudo chmod o-rwx "${deadline_certificates_location}/mongo_client.pem"
-
+  db_certificate_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificate" "$server_cert_basename"
+  
   sudo service Deadline10db stop # stop service before updating config.
 
   # configure x509 user: https://docs.mongodb.com/v3.6/tutorial/configure-x509-client-authentication/
@@ -464,11 +460,7 @@ function generate_certs_for_clients {
   # sudo mv -v "${ssl_keygen_path}/mongo_client.pem" "$deadline_client_certificates_location"
 
   # Certs Permissions
-  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
-  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
-  # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
-  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
-  # sudo chmod o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+  client_certificate_permissions "$deadlineuser_name" "$deadline_client_certificates_location" "$deadline_proxy_certificate_basename" "$server_cert_basename"
 
   # sudo service Deadline10db start # stop service before updating config.
 
@@ -504,7 +496,7 @@ db.getSiblingDB("\$external").runCommand(
 END
 )
 
-  start_service_and_validate "$dbport"
+  start_db_service_and_validate "$dbport"
   echo "...Adding x509 Admin User for RCS: $LINE1"
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE1"
   echo "...Adding x509 Remote Client User for RCS: $LINE2"
@@ -558,22 +550,45 @@ END
 # security:
 #   authorization: enabled
 
-function post_db_install_permissions {
-  echo "...Configure permissions post DB install"
+function db_certificate_permissions {
   local -r deadlineuser_name="$1"
   local -r deadline_certificates_location="$2"
-
-  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
-
-  # finalize permissions post install:
-  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/
-  sudo chmod u+rX,g+rX,o-rwx /opt/Thinkbox/
+  local -r deadline_client_certificate="$3"
+  local -r server_cert_basename="$4"
 
   sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location
   sudo chmod u+rX,g+rX,o-rwx $deadline_certificates_location
 
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_certificates_location/*
+  sudo chmod u=r,g=r,o=r "${deadline_certificates_location}/${deadline_client_certificate}"
+  sudo chmod o-rwx ${deadline_certificates_location}/$deadline_client_certificate
+  sudo chmod o-rwx "${deadline_certificates_location}/${server_cert_basename}.pem"
+  sudo chmod o-rwx "${deadline_certificates_location}/mongo_client.pem"
+}
+
+function client_certificate_permissions {
+  local -r deadlineuser_name="$1"
+  local -r deadline_client_certificates_location="$2"
+  local -r deadline_proxy_certificate_basename="$3"
+  local -r server_cert_basename="$4"
+
   sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location
   sudo chmod u+rX,g+rX,o-rwx $deadline_client_certificates_location
+
+  sudo chown $deadlineuser_name:$deadlineuser_name $deadline_client_certificates_location/*
+  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${deadline_proxy_certificate_basename}.pfx"
+  sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
+}
+
+
+
+function post_db_install_permissions {
+  echo "...Configure permissions post DB install"
+  local -r deadlineuser_name="$1"
+
+  # finalize permissions post install:
+  sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/
+  sudo chmod u+rX,g+rX,o-rwx /opt/Thinkbox/
 
   sudo chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10
   sudo chmod -R u=rX,g=rX,o-rwx /opt/Thinkbox/DeadlineRepository10
@@ -957,12 +972,13 @@ function options { # Not all defaults are available as args, however the script 
       install_db_without_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
     else
       install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
+      db_certificate_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificate" "$server_cert_basename" # check permissions again.
     fi
   fi
 
   # cert gen has been tested to work at this point here.
 
-  post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
+  post_db_install_permissions "$deadlineuser_name"
   
   echo "Show: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"
   cat /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
@@ -970,6 +986,7 @@ function options { # Not all defaults are available as args, however the script 
   # Install RCS
   if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
     install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
+    client_certificate_permissions "$deadlineuser_name" "$deadline_client_certificates_location" "$deadline_proxy_certificate_basename" "$server_cert_basename"
   else
     install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages" "$server_cert_basename"
   fi
@@ -981,16 +998,14 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
     generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
   fi
-
-  post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location" # check permissions again.
-
+  
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen_db" == "true" ]]; then
     configure_auth "$deadlineuser_name"
   fi
 
   # Start the service and validate the configuration is working
-  start_service_and_validate "$dbport"
+  start_db_service_and_validate "$dbport"
   start_launcher # TODO we should validate this too
 
 }
