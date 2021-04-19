@@ -510,15 +510,9 @@ END
   echo "...Adding x509 Remote Client User for RCS: $LINE2"
   sudo /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo --eval "$LINE2"
 
-  # TODO need to add remote user for RCS
-
+  # TODO need to add remote user for RCS with correct permissions
   sudo service Deadline10db restart
 }
-
-
-
-
-
 
 # After DB install, certs exist here
 # ls -ltriah /opt/Thinkbox/DeadlineDatabase10/certs/
@@ -965,14 +959,8 @@ function options { # Not all defaults are available as args, however the script 
       install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
     fi
   fi
-
-  # Generate certs seperately
-  if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
-    generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate"
-  fi
-  if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
-    generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
-  fi
+  
+  # cert gen has been tested to work at this point here.
 
   post_db_install_permissions "$deadlineuser_name" "$deadline_certificates_location"
   
@@ -985,6 +973,15 @@ function options { # Not all defaults are available as args, however the script 
   else
     install_rcs_no_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages" "$server_cert_basename"
   fi
+
+  # Generate certs seperately
+  if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
+    generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate"
+  fi
+  if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
+    generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
+  fi
+
   configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   if [[ "$post_certgen_db" == "true" ]]; then
     configure_auth "$deadlineuser_name"
