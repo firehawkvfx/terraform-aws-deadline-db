@@ -1,8 +1,0 @@
-#!/bin/sh
-
-# This script is a simple wrapper that connects to the Deadline Mongo Database utilizing the parameters that were provided at time of installation.
-# Any extra arguments passed to the script will be transparently passed to the mongo.exe client.
-
-# exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27017" --ssl --sslPEMKeyFile "/etc/ssl/mongodb_consolidated_certs.pem" --sslCAFile "/etc/ssl/mongodb_ca.pem" --authenticationDatabase '$external' --authenticationMechanism "MONGODB-X509" --username "OU=Deadline10Client,O=Deadline10Installer,CN=Deadline10Client" "$@"
-
-exec /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/mongo "deadline10db" --host "deadlinedb.service.consul" --port "27017" --ssl --sslPEMKeyFile "/etc/ssl/client.pem" --sslCAFile "/etc/ssl/ca.pem" --authenticationDatabase '$external' --authenticationMechanism "MONGODB-X509" --username "CN=Deadline10Client,O=Deadline10Installer,OU=Deadline10Client,keyUsage=digitalSignature,extendedKeyUsage=clientAuth" "$@"

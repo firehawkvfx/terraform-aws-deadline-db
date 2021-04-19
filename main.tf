@@ -71,7 +71,7 @@ locals {
   instance_name              = "${lookup(local.common_tags, "vpcname", "default")}_deadlinedbvaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
 }
 module "deadline_db_vault_client" {
-  source                      = "./modules/deadline-db-vault-client"
+  source                      = "./modules/aws-ec2-deadline-db"
   name                        = local.instance_name
   deadline_db_ami_id          = var.deadline_db_ami_id
   consul_cluster_name         = var.consul_cluster_name

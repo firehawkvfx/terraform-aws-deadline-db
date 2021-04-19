@@ -1,5 +1,0 @@
----
-collections:
-  - name: https://github.com/firehawkvfx/ansible_collection_core.git
-    type: git
-    # version: 1.0.0
