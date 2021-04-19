@@ -517,50 +517,6 @@ END
   sudo service Deadline10db restart
 }
 
-# After DB install, certs exist here
-# ls -ltriah /opt/Thinkbox/DeadlineDatabase10/certs/
-# total 24K
-# 522562 drwxr-xr-x 4 root   root   4.0K Apr  3 23:27 ..
-# 768030 -r--r----- 1 ubuntu ubuntu 1.2K Apr  3 23:27 ca.crt
-# 768038 -r--r----- 1 ubuntu ubuntu 3.3K Apr  3 23:27 Deadline10Client.pfx
-# 768034 -r--r----- 1 ubuntu ubuntu 2.9K Apr  3 23:27 deadlinedb.service.consul.pem
-# 768036 -r--r----- 1 ubuntu ubuntu 3.0K Apr  3 23:27 mongo_client.pem
-
-# and after RCS:
-# ls -ltriah /opt/Thinkbox/certs/
-# total 20K
-# 521283 -r-------- 1 ubuntu root   1.2K Apr  3 23:29 ca.crt
-# 521289 -r-------- 1 ubuntu root   3.3K Apr  3 23:29 deadlinedb.service.consul.pfx
-# 521292 -r-------- 1 root   root   3.3K Apr  3 23:29 Deadline10RemoteClient.pfx
-
-#MongoDB config file
-# systemLog:
-#   destination: file
-#   # Mongo DB's output will be logged here.
-#   path: /opt/Thinkbox/DeadlineDatabase10/mongo/data/logs/log.txt
-#   # Default to quiet mode to limit log output size. Set to 'false' when debugging.
-#   quiet: true
-#   # Increase verbosity level for more debug messages (max: 5)
-#   verbosity: 0
-# net:
-#   # Port MongoDB will listen on for incoming connections
-#   port: 27100
-#   ipv6: true
-#   ssl:
-#     # SSL/TLS options
-#     mode: requireSSL
-#     # If enabling TLS, the below options need to be set:
-#     PEMKeyFile: /opt/Thinkbox/DeadlineDatabase10/certs/deadlinedb.service.consul.pem
-#     CAFile: /opt/Thinkbox/DeadlineDatabase10/certs/ca.crt
-#   # By default mongo will only use localhost, this will allow us to use the IP Address
-#   bindIpAll: true
-# storage:
-#   # Database files will be stored here
-#   dbPath: /opt/Thinkbox/DeadlineDatabase10/mongo/data
-#   engine: wiredTiger
-# security:
-#   authorization: enabled
-
 function db_certificate_permissions {
   local -r deadlineuser_name="$1"
   local -r deadline_certificates_location="$2"
@@ -591,8 +547,6 @@ function client_certificate_permissions {
   sudo chmod u=rw,g=r,o-rwx "${deadline_client_certificates_location}/${server_cert_basename}.pfx"
 }
 
-
-
 function post_db_install_permissions {
   echo "...Configure permissions post DB install"
   local -r deadlineuser_name="$1"
@@ -618,56 +572,6 @@ function post_db_install_permissions {
   sudo systemctl daemon-reload
   sudo service Deadline10db start
 }
-
-# function install_rcs_generate_certs {
-#   local -r deadline_installer_dir="$1"
-#   local -r deadline_client_installer_filename="$2"
-#   local -r deadline_certificates_location="$3"
-#   local -r deadline_client_certificates_location="$4"
-#   local -r deadline_client_certificate="$5"
-#   local -r deadline_proxy_certificate="$6"
-#   local -r deadlineuser_name="$7"
-#   local -r httpport="$8"
-#   local -r proxyport="$9"
-#   local -r deadline_proxy_root_dir="${10}"
-#   local -r skip_install_packages="${11}"
-
-#   # Directories and Permissions
-#   if [[ "$skip_install_packages" == "false" ]]; then
-#     echo "...Install packages for Deadline RCS"
-#     sudo apt-get install -y xdg-utils
-#     sudo apt-get install -y lsb # required for render nodes as well
-#   fi
-#   sudo mkdir -p /usr/share/desktop-directories
-
-#   echo "...Installing Deadline Client: RCS with certs"
-#   # Install Client:
-#   # Deadline RCS
-#   sudo $deadline_installer_dir/$deadline_client_installer_filename \
-#   --mode unattended \
-#   --launcherdaemon true \
-#   --enable-components proxyconfig \
-#   --servercert "${deadline_certificates_location}/${deadline_client_certificate}" \
-#   --debuglevel 2 \
-#   --prefix /opt/Thinkbox/Deadline10 \
-#   --connectiontype Repository \
-#   --repositorydir /opt/Thinkbox/DeadlineRepository10/ \
-#   --dbsslcertificate "${deadline_certificates_location}/${deadline_client_certificate}" \
-#   --licensemode UsageBased \
-#   --daemonuser "$deadlineuser_name" \
-#   --connserveruser "$deadlineuser_name" \
-#   --httpport $httpport \
-#   --tlsport $proxyport \
-#   --enabletls true \
-#   --tlscertificates generate  \
-#   --generatedcertdir "${deadline_client_certificates_location}/" \
-#   --slavestartup false \
-#   --proxyrootdir $deadline_proxy_root_dir \
-#   --proxycertificate $deadline_client_certificates_location/$deadline_proxy_certificate
-#   # --dbsslpassword avaultpassword \
-#   # --clientcert_pass avaultpassword \
-#   # --proxycertificatepassword avaultpassword
-# }
 
 function install_rcs_no_generate_certs {
   local -r deadline_installer_dir="$1"
@@ -814,55 +718,6 @@ function configure_auth {
   sudo chown $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/DeadlineRepository10/settings/connection.ini
 }
 
-# cat /var/lib/Thinkbox/Deadline10/deadline.ini
-# [Deadline]
-# HttpListenPort=8080
-# TlsListenPort=4433
-# TlsServerCert=/opt/Thinkbox/certs//deadlinedb.service.consul.pfx
-# TlsCaCert=/opt/Thinkbox/certs//ca.crt
-# TlsAuth=True
-# LaunchRemoteConnectionServerAtStartup=True
-# KeepRemoteConnectionServerRunning=True
-# LicenseMode=Standard
-# LicenseServer=
-# Region=
-# LauncherListeningPort=17000
-# LauncherServiceStartupDelay=60
-# AutoConfigurationPort=17001
-# SlaveStartupPort=17003
-# SlaveDataRoot=
-# RestartStalledSlave=false
-# NoGuiMode=false
-# LaunchSlaveAtStartup=false
-# AutoUpdateOverride=
-# IncludeRCSInLauncherMenu=true
-# ConnectionType=Repository
-# NetworkRoot=/opt/Thinkbox/DeadlineRepository10/
-# DbSSLCertificate=/opt/Thinkbox/DeadlineDatabase10/certs/Deadline10Client.pfx
-# NetworkRoot0=/opt/Thinkbox/DeadlineRepository10/;/opt/Thinkbox/DeadlineDatabase10/certs/Deadline10Client.pfx
-# LaunchPulseAtStartup=True
-# ProxyRoot=deadlinedb.service.consul:4433
-# ProxyUseSSL=True
-# ProxySSLCertificate=/opt/Thinkbox/certs/Deadline10RemoteClient.pfx
-# ProxyRoot0=deadlinedb.service.consul:4433;/opt/Thinkbox/certs/Deadline10RemoteClient.pfx
-
-# cat /opt/Thinkbox/DeadlineRepository10/settings/connection.ini 
-# [Connection]
-# AlternatePort=0
-# Authenticate=True
-# DatabaseName=deadline10db
-# DbType=MongoDB
-# EnableSSL=True
-# Hostname=deadlinedb.service.consul
-# PasswordHash=
-# Port=27100
-# ReplicaSetName=
-# SplitDB=False
-# Username=
-# Version=10
-# StorageAccess=Database
-# CACertificatePath=
-
 function set_hostname {
   db_host_name="$1"
   echo "...Set hostname"
@@ -888,6 +743,7 @@ function options { # Not all defaults are available as args, however the script 
   local skip_download_installers="false"
   local skip_install_packages="false"
   local skip_install_db="false"
+  local skip_install_validation="false"
 
   while [[ $# > 0 ]]; do
     local key="$1"
@@ -929,6 +785,9 @@ function options { # Not all defaults are available as args, however the script 
         ;;
       --skip-install-packages)
         skip_install_packages="true"
+        ;;
+      --skip-install-validation)
+        skip_install_validation="true"
         ;;
       --help)
         print_usage
@@ -975,6 +834,7 @@ function options { # Not all defaults are available as args, however the script 
   if [[ "$skip_install_packages" == "false" ]]; then
     get_ssl_gen_repo "$deadlineuser_name" "$skip_install_packages" # this repo contains the deadline script to generate certificates
   fi
+  
   # Install DB
   if [[ "$skip_install_db" == "false" ]]; then
     setup_directories_and_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificates_location"
@@ -985,15 +845,9 @@ function options { # Not all defaults are available as args, however the script 
       install_db_with_certs "$deadline_installer_dir" "$deadline_db_installer_filename" "$mongo_installer_tgz" "$dbport" "$db_host_name" "$deadlineuser_name" "$deadline_certificates_location"
       db_certificate_permissions "$deadlineuser_name" "$deadline_certificates_location" "$deadline_client_certificate" "$server_cert_basename" # check permissions again.
     fi
+    post_db_install_permissions "$deadlineuser_name"
   fi
 
-  # cert gen has been tested to work at this point here.
-
-  post_db_install_permissions "$deadlineuser_name"
-  
-  echo "Show: /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo"
-  cat /opt/Thinkbox/DeadlineDatabase10/mongo/application/bin/deadline_mongo 
-  
   # Install RCS
   if [[ "$skip_certgen_during_rcs_install" == "false" ]]; then
     install_rcs_generate_certs "$deadline_installer_dir" "$deadline_client_installer_filename" "$deadline_certificates_location" "$deadline_client_certificates_location" "$deadline_client_certificate" "$deadline_proxy_certificate" "$deadlineuser_name" "$httpport" "$proxyport" "$deadline_proxy_root_dir" "$skip_install_packages"
@@ -1005,22 +859,18 @@ function options { # Not all defaults are available as args, however the script 
   # Generate certs seperately
   if [[ "$post_certgen_db" == "true" ]]; then # DB can use externally generated certificates
     generate_certs_for_db_and_rcs "$deadlineuser_name" "$cert_org" "$cert_ou" "$server_cert_basename" "$deadline_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
+    configure_auth "$deadlineuser_name"
   fi
   if [[ "$post_certgen_rcs" == "true" ]]; then # RCS can use externally generated certificates
     generate_certs_for_clients "$deadlineuser_name" "$cert_org" "$rcs_cert_ou" "$server_cert_basename" "$deadline_client_certificates_location" "$deadline_client_certificate_basename" "$deadline_client_certificate" "$skip_install_packages" "$deadline_version" "$deadline_proxy_certificate" "$dbport"
+    configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
   fi
 
-  configure_deadline "$deadline_proxy_root_dir" "$deadline_certificates_location" "$deadline_client_certificate" "$deadline_client_certificates_location" "$deadline_proxy_certificate"
-  if [[ "$post_certgen_db" == "true" ]]; then
-    configure_auth "$deadlineuser_name"
+  # Start the service and validate the configuration is working.  This can be done once certs are installed.
+  if [[ "$skip_install_validation" == "false" ]]; then
+    start_db_service_and_validate "$dbport"
+    start_launcher "$dbport" "$proxyport" # TODO we should validate this too
   fi
-
-  # Start the service and validate the configuration is working
-  start_db_service_and_validate "$dbport"
-  start_launcher "$dbport" "$proxyport" # TODO we should validate this too
-
 }
 
 options "$@"
-
-
