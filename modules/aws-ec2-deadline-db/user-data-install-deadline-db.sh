@@ -19,8 +19,8 @@ example_role_name="${example_role_name}"
 # Script vars (implicit)
 export VAULT_ADDR="https://vault.service.consul:8200"
 client_cert_vault_path="${client_cert_vault_path}" # the path will be erased before installation commences
-installer_file="install-deadlinedb"
-installer_path="/home/$deadlineuser_name/Downloads/$installer_file"
+# installer_file="install-deadlinedb"
+installer_path="/var/tmp/install-deadlinedb"
 
 # Functions
 function log {
@@ -70,26 +70,26 @@ if $(has_yum); then
     # systemctl restart network # we restart the network later, needed to update the host name
 fi
 
-### Create deadlineuser
-function add_sudo_user() {
-  local -r user_name="$1"
-  if $(has_apt_get); then
-    sudo_group=sudo
-  elif $(has_yum); then
-    sudo_group=wheel
-  else
-    echo "ERROR: Could not find apt-get or yum."
-    exit 1
-  fi
-  echo "Adding user: $user_name with groups: $sudo_group $user_name"
-  sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
-  echo "Adding user as passwordless sudoer."
-  touch "/etc/sudoers.d/98_$user_name"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_$user_name"
-  sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
-  # Generate a public and private key - some tools can fail without one.
-  sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
-}
-add_sudo_user $deadlineuser_name
+# ### Create deadlineuser
+# function add_sudo_user() {
+#   local -r user_name="$1"
+#   if $(has_apt_get); then
+#     sudo_group=sudo
+#   elif $(has_yum); then
+#     sudo_group=wheel
+#   else
+#     echo "ERROR: Could not find apt-get or yum."
+#     exit 1
+#   fi
+#   echo "Adding user: $user_name with groups: $sudo_group $user_name"
+#   sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
+#   echo "Adding user as passwordless sudoer."
+#   touch "/etc/sudoers.d/98_$user_name"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_$user_name"
+#   sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
+#   # Generate a public and private key - some tools can fail without one.
+#   sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
+# }
+# add_sudo_user $deadlineuser_name
 
 ### Vault Auth IAM Method CLI
 retry \
@@ -107,19 +107,5 @@ erase_vault_file $client_cert_vault_path
 echo "Revoking vault token..."
 vault token revoke -self
 
-### Install Deadline
-# DB and RCS with certificates
-echo "Ensuring dir exists: $(dirname $installer_path)"
-sudo -i -u $deadlineuser_name mkdir -p "$(dirname $installer_path)"
-
-aws s3api get-object --bucket "$installers_bucket" --key "$installer_file" "$installer_path"
-chown $deadlineuser_name:$deadlineuser_name $installer_path
-chmod u+x $installer_path
-
-# sudo -i -u $deadlineuser_name $installer_path --installers-bucket "$installers_bucket" --deadlineuser-name "$deadlineuser_name" --deadline-version "$deadline_version"
-# test minimal defaults
-# sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --skip-download-installers
-
-# # generate certs after install test
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-certgen-during-db-install --post-certgen-db --skip-certgen-during-rcs-install --post-certgen-rcs
-
+### Install Deadline # Generate certs after install test
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
