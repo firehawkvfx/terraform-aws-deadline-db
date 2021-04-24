@@ -19,8 +19,8 @@ example_role_name="${example_role_name}"
 # Script vars (implicit)
 export VAULT_ADDR="https://vault.service.consul:8200"
 client_cert_vault_path="${client_cert_vault_path}" # the path will be erased before installation commences
-# installer_file="install-deadlinedb"
-installer_path="/var/tmp/install-deadlinedb"
+# installer_file="install-deadline"
+installer_path="/var/tmp/install-deadline"
 
 # Functions
 function log {
