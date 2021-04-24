@@ -70,27 +70,6 @@ if $(has_yum); then
     # systemctl restart network # we restart the network later, needed to update the host name
 fi
 
-# ### Create deadlineuser
-# function add_sudo_user() {
-#   local -r user_name="$1"
-#   if $(has_apt_get); then
-#     sudo_group=sudo
-#   elif $(has_yum); then
-#     sudo_group=wheel
-#   else
-#     echo "ERROR: Could not find apt-get or yum."
-#     exit 1
-#   fi
-#   echo "Adding user: $user_name with groups: $sudo_group $user_name"
-#   sudo useradd -m -d /home/$user_name/ -s /bin/bash -G $sudo_group $user_name
-#   echo "Adding user as passwordless sudoer."
-#   touch "/etc/sudoers.d/98_$user_name"; grep -qxF "$user_name ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/98_$user_name || echo "$user_name ALL=(ALL) NOPASSWD:ALL" >> "/etc/sudoers.d/98_$user_name"
-#   sudo -i -u $user_name mkdir -p /home/$user_name/.ssh
-#   # Generate a public and private key - some tools can fail without one.
-#   sudo -i -u $user_name bash -c "ssh-keygen -q -b 2048 -t rsa -f /home/$user_name/.ssh/id_rsa -C \"\" -N \"\""  
-# }
-# add_sudo_user $deadlineuser_name
-
 ### Vault Auth IAM Method CLI
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
@@ -108,4 +87,4 @@ echo "Revoking vault token..."
 vault token revoke -self
 
 ### Install Deadline # Generate certs after install test
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
