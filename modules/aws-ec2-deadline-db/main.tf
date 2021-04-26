@@ -154,6 +154,7 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
 resource "aws_instance" "deadline_db_vault_client" {
   depends_on             = [aws_s3_bucket_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
+  # private_ip 
   ami                    = var.deadline_db_ami_id
   instance_type          = var.instance_type
   key_name               = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.
