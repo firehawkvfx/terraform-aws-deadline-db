@@ -152,20 +152,20 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
   }
 }
 data "aws_subnet" "private" {
-  for_each = tolist(var.private_subnet_ids)
-  id       = each.value
+  id       = var.private_subnet_ids[0]
 }
 locals {
-  private_subnet_cidr_blocks = [for s in data.aws_subnet.private : s.cidr_block]
+  private_subnet_cidr_block = data.aws_subnet.private.cidr_block
+  private_ip = cidrhost(local.private_subnet_cidr_block, var.host_number)
 }
 resource "aws_instance" "deadline_db_vault_client" {
   depends_on             = [aws_s3_bucket_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
-  private_ip             = cidrhost(local.private_subnet_cidr_blocks[0], var.host_number)
+  private_ip             = local.private_ip # Deadline DB is not configured for HA
   ami                    = var.deadline_db_ami_id
   instance_type          = var.instance_type
   key_name               = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.
-  subnet_id              = tolist(var.private_subnet_ids)[0]
+  subnet_id              = data.aws_subnet.private.id
   tags                   = merge(map("Name", var.name), var.common_tags, local.extra_tags)
   user_data              = data.template_file.user_data_auth_client.rendered
   iam_instance_profile   = data.terraform_remote_state.deadline_db_profile.outputs.instance_profile_name
