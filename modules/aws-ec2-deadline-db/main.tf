@@ -104,19 +104,6 @@ resource "aws_s3_bucket_object" "update_scripts" {
   source   = "${path.module}/scripts/${each.value}"
   etag     = filemd5("${path.module}/scripts/${each.value}")
 }
-locals {
-  resourcetier = var.common_tags["resourcetier"]
-  extra_tags = {
-    role  = "deadline_db_vault_client"
-    route = "private"
-  }
-  private_ip                                 = element(concat(aws_instance.deadline_db_vault_client.*.private_ip, list("")), 0)
-  id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
-  deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
-  vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
-  client_cert_file_path                      = "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
-  client_cert_vault_path                     = "${local.resourcetier}/deadline/client_cert_files${local.client_cert_file_path}"
-}
 data "template_file" "user_data_auth_client" {
   template = format(
     "%s%s%s%s",
@@ -157,6 +144,16 @@ data "aws_subnet" "private" {
 locals {
   private_subnet_cidr_block = data.aws_subnet.private.cidr_block
   private_ip = cidrhost(local.private_subnet_cidr_block, var.host_number)
+  resourcetier = var.common_tags["resourcetier"]
+  id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
+  deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
+  vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
+  client_cert_file_path                      = "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+  client_cert_vault_path                     = "${local.resourcetier}/deadline/client_cert_files${local.client_cert_file_path}"
+  extra_tags = {
+    role  = "deadline_db_vault_client"
+    route = "private"
+  }
 }
 resource "aws_instance" "deadline_db_vault_client" {
   depends_on             = [aws_s3_bucket_object.update_scripts]
