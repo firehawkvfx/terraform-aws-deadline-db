@@ -96,5 +96,5 @@ apt-get install -y zip unzip
 cd /opt/Thinkbox/DeadlineRepository10/submission
 find . -type d -maxdepth 1 -mindepth 1 -exec zip -r -D '{}.zip' '{}' \; 
 
-set -x
 aws s3 sync /opt/Thinkbox/DeadlineRepository10/submission "s3://$installers_bucket/Deadline_$deadline_version/Thinkbox/DeadlineRepository10/submission"
+
