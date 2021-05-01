@@ -151,10 +151,17 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
     region = data.aws_region.current.name
   }
 }
+data "aws_subnet" "private" {
+  for_each = var.private_subnet_ids
+  id       = each.value
+}
+locals {
+  private_subnet_cidr_blocks = [for s in data.aws_subnet.private : s.cidr_block]
+}
 resource "aws_instance" "deadline_db_vault_client" {
   depends_on             = [aws_s3_bucket_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
-  # private_ip 
+  private_ip             = cidrhost(local.private_subnet_cidr_blocks[0], var.host_number)
   ami                    = var.deadline_db_ami_id
   instance_type          = var.instance_type
   key_name               = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.

@@ -58,6 +58,11 @@ variable "private_subnet_ids" {
   description = "The list of private subnets to deploy into.  Currently only the first subnet is used."
   type        = list(string)
 }
+variable "host_number" {
+  description = "The host number or offset for the private ip address in the CIDR range"
+  type = string
+  default = "12"
+}
 variable "instance_type" {
   description = "The AWS instance type to use."
   type        = string
