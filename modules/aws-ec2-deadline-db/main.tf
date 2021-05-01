@@ -152,7 +152,7 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
   }
 }
 data "aws_subnet" "private" {
-  for_each = var.private_subnet_ids
+  for_each = tolist(var.private_subnet_ids)
   id       = each.value
 }
 locals {
