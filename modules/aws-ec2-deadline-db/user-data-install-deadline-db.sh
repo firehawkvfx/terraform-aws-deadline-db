@@ -89,10 +89,3 @@ vault token revoke -self
 ### Install Deadline # Generate certs after install test
 sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
 
-apt-get install -y zip unzip # TODO relocate this block to the image build stage.
-
-cd /opt/Thinkbox/DeadlineRepository10/submission
-find . -type d -maxdepth 1 -mindepth 1 -exec zip -r -D '{}.zip' '{}' \; 
-
-aws s3 sync /opt/Thinkbox/DeadlineRepository10/submission "s3://$installers_bucket/Deadline-$deadline_version/Thinkbox/DeadlineRepository10/submission"
-
