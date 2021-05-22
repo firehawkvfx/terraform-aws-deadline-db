@@ -22,14 +22,14 @@ resource "aws_security_group" "deadline_db_vault_client" {
     security_groups = var.security_group_ids
     description     = "SSH"
   }
-  ingress {
-    protocol        = "tcp"
-    from_port       = 8200
-    to_port         = 8200
-    cidr_blocks     = var.permitted_cidr_list
-    security_groups = var.security_group_ids
-    description     = "Vault Web UI Forwarding"
-  }
+  # ingress {
+  #   protocol        = "tcp"
+  #   from_port       = 8200
+  #   to_port         = 8200
+  #   cidr_blocks     = var.permitted_cidr_list
+  #   security_groups = var.security_group_ids
+  #   description     = "Vault Web UI Forwarding"
+  # }
   ingress {
     protocol    = "tcp"
     from_port   = 17000
