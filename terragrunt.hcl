@@ -13,9 +13,7 @@ dependencies {
     "../terraform-aws-render-vpc-vault-vpc-peering",
     "../../../firehawk-main/modules/terraform-aws-sg-bastion",
     "../../../firehawk-main/modules/terraform-aws-sg-vpn",
-    "../../../firehawk-main/modules/vault",
-    # "../../../firehawk-main/modules/vault-configuration",
-    "../../../firehawk-main/modules/terraform-aws-iam-profile-deadline-db"
+    "../../../firehawk-main/modules/vault"
     ]
 }
 
