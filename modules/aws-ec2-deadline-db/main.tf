@@ -33,11 +33,20 @@ resource "aws_security_group" "deadline_db_vault_client" {
   ingress {
     protocol    = "tcp"
     from_port   = 17000
-    to_port     = 17003
+    to_port     = 17004
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
     description = "Launcher Listening Port, Deadline Auto Config Port, Deadline Worker / Slave Startup Port"
   }
+  ingress {
+    protocol    = "tcp"
+    from_port   = 1715
+    to_port     = 1715
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Hserver port for UBL"
+  }
+  
   # ingress {
   #   protocol    = "tcp"
   #   from_port   = 17001
@@ -122,6 +131,7 @@ data "template_file" "user_data_auth_client" {
     resourcetier      = local.resourcetier
     db_host_name      = "deadlinedb.service.consul"
     installers_bucket = "software.${var.bucket_extension}"
+    ubl_certs_bucket  = "ublcerts.${var.bucket_extension_vault}"
     deadlineuser_name = "deadlineuser" # Create this user and install software as this user.
     deadline_version  = var.deadline_version
     consul_service    = "deadlinedb"
@@ -139,12 +149,12 @@ data "terraform_remote_state" "deadline_db_profile" { # read the arn with data.t
   }
 }
 data "aws_subnet" "private" {
-  id       = var.private_subnet_ids[0]
+  id = var.private_subnet_ids[0]
 }
 locals {
-  private_subnet_cidr_block = data.aws_subnet.private.cidr_block
-  private_ip = cidrhost(local.private_subnet_cidr_block, var.host_number)
-  resourcetier = var.common_tags["resourcetier"]
+  private_subnet_cidr_block                  = data.aws_subnet.private.cidr_block
+  private_ip                                 = cidrhost(local.private_subnet_cidr_block, var.host_number)
+  resourcetier                               = var.common_tags["resourcetier"]
   id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
   deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
   vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
