@@ -19,10 +19,10 @@ resource "aws_security_group" "deadline_license_forwarder" {
   ingress {
     protocol    = "tcp"
     from_port   = 1715
-    to_port     = 1715
+    to_port     = 1716
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
-    description = "Hserver port for UBL"
+    description = "Hserver port for UBL - Engine & Mantra"
   }
 }
 
