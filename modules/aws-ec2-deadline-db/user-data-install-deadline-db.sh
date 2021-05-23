@@ -108,6 +108,11 @@ else
   echo "...Skipping configuring UBL license forwarder.  No certs found in $ubl_certs_bucket at ublcertszip/certs.zip"
 fi
 
+# if debugging the install script, it is possible to test without rebuilding image.
+rm -fr /var/tmp/aws-thinkbox-deadline
+cd /var/tmp; git clone --branch v0.0.3 https://github.com/firehawkvfx/aws-thinkbox-deadline.git
+sudo chown -R $deadlineuser_name:$deadlineuser_name /var/tmp/aws-thinkbox-deadline
+
 ### Install Deadline # Generate certs after install test
 set -x
 sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs --license-forwarder "$license_forwarder"
