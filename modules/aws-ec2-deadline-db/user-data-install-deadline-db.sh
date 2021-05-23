@@ -99,7 +99,7 @@ if [[ $exit_status -eq 0 ]]; then
   unzip ublcerts.zip -d ublcerts
   chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/certs/ublcerts/
   chmod -R 600 /opt/Thinkbox/certs/ublcerts/
-  chmod 700 /opt/Thinkbox/certs/ublcerts
+  chmod u+x /opt/Thinkbox/certs/ublcerts
 
   ulimit -n 64000 # configure limits https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/license-forwarder.html
 
