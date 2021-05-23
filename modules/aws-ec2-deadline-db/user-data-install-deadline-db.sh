@@ -20,7 +20,7 @@ example_role_name="${example_role_name}"
 export VAULT_ADDR="https://vault.service.consul:8200"
 client_cert_vault_path="${client_cert_vault_path}" # the path will be erased before installation commences
 # installer_file="install-deadline"
-installer_path="/var/tmp/install-deadline"
+installer_path="/var/tmp/aws-thinkbox-deadline/install-deadline"
 
 # Functions
 function log {
@@ -89,7 +89,8 @@ vault token revoke -self
 echo "...Determining if ubl certs have been provided" # need to exec ./deadlinelicenseforwarder -sslpath /opt/Thinkbox/certs/ublcerts or add to deadline config for client
 ubl_certs_bucket=${ubl_certs_bucket}
 output=$(aws s3api head-object --bucket "$ubl_certs_bucket" --key "ublcertszip/certs.zip") && exit_status=0 || exit_status=$?
-forwarder_args=""
+
+license_forwarder="none"
 
 if [[ $exit_status -eq 0 ]]; then
   echo "...Retrieving Certs"
@@ -102,11 +103,11 @@ if [[ $exit_status -eq 0 ]]; then
 
   ulimit -n 64000 # configure limits https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/license-forwarder.html
 
-  forwarder_args="--license-forwarder /opt/Thinkbox/certs/ublcerts"
+  license_forwarder="/opt/Thinkbox/certs/ublcerts"
 else
   echo "...Skipping configuring UBL license forwarder.  No certs found in $ubl_certs_bucket at ublcertszip/certs.zip"
 fi
 
 ### Install Deadline # Generate certs after install test
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs $forwarder_args
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs --license-forwarder "$license_forwarder"
 
