@@ -1,7 +1,7 @@
 variable "name" {
   description = "The name used to define resources in this module"
   type        = string
-  default     = "deadline_db_vault_client"
+  default     = "deadline_db_instance"
 }
 variable "deadline_db_ami_id" {
   description = "The prebuilt AMI for the vault client host. This should be a private ami you have built with packer."
@@ -17,18 +17,6 @@ variable "vpc_id" {
   type        = string
   default     = null
 }
-
-# variable "vpn_cidr" {
-#   description = "The CIDR range that the vpn will assign using DHCP.  These are virtual addresses for routing traffic."
-#   type        = string
-# }
-
-# variable "deployer_ip_cidr" {
-#   description = "The remote public address that will connect to the bastion instance and other public instances.  This is used to limit inbound access to public facing hosts like the VPN from your site's public IP."
-#   type        = string
-#   default     = null
-# }
-
 variable "common_tags" {
   description = "A map of common tags to assign to the resources created by this module"
   type        = map(string)
@@ -60,8 +48,8 @@ variable "private_subnet_ids" {
 }
 variable "host_number" {
   description = "The host number or offset for the private ip address in the CIDR range"
-  type = string
-  default = "12"
+  type        = string
+  default     = "12"
 }
 variable "instance_type" {
   description = "The AWS instance type to use."
@@ -86,12 +74,12 @@ variable "aws_internal_domain" {
   type        = string
 }
 variable "bucket_extension_vault" {
-    description = "The bucket extension where the terraform remote state resides"
-    type = string
+  description = "The bucket extension where the terraform remote state resides"
+  type        = string
 }
 variable "bucket_extension" {
-    description = "The bucket extension where the software installers reside"
-    type = string
+  description = "The bucket extension where the software installers reside"
+  type        = string
 }
 variable "deadline_version" {
   description = "The deadline version to install"

@@ -1,12 +1,47 @@
 # A vault client host with consul registration and signed host keys from vault.
 
 data "aws_region" "current" {}
-resource "aws_security_group" "deadline_db_vault_client" {
+
+resource "aws_security_group" "deadline_license_forwarder" {
   count       = var.create_vpc ? 1 : 0
-  name        = var.name
+  name        = "deadline_license_forwarder_sg"
   vpc_id      = var.vpc_id
-  description = "Vault client security group"
-  tags        = merge(map("Name", var.name), var.common_tags, local.extra_tags)
+  description = "Deadline DB security group"
+  tags        = local.common_tags
+  ingress {
+    protocol    = "tcp"
+    from_port   = 17004
+    to_port     = 17005
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Launcher Listening Port, Deadline Auto Config Port, Deadline Worker / Slave Startup Port"
+  }
+  ingress {
+    protocol    = "tcp"
+    from_port   = 1715
+    to_port     = 1715
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Hserver port for UBL"
+  }
+}
+
+# resource "aws_security_group" "consul_clients" {
+#   name        = "Consul clients security group"
+#   description = "Security group for Consul Clients"
+#   vpc_id      = var.vpc_id
+# }
+
+# module "security_group_rules" {
+#   source = "git::git@github.com:hashicorp/terraform-aws-consul.git//modules/consul-client-security-group-rules?ref=v0.0.2"
+#   security_group_id = resource.aws_security_group.security_group_id
+# }
+resource "aws_security_group" "deadline_db_instance" { # see https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/considerations.html
+  count       = var.create_vpc ? 1 : 0
+  name        = "deadline_db_sg"
+  vpc_id      = var.vpc_id
+  description = "Deadline DB security group"
+  tags        = local.common_tags
   ingress {
     protocol    = "-1"
     from_port   = 0
@@ -22,47 +57,14 @@ resource "aws_security_group" "deadline_db_vault_client" {
     security_groups = var.security_group_ids
     description     = "SSH"
   }
-  # ingress {
-  #   protocol        = "tcp"
-  #   from_port       = 8200
-  #   to_port         = 8200
-  #   cidr_blocks     = var.permitted_cidr_list
-  #   security_groups = var.security_group_ids
-  #   description     = "Vault Web UI Forwarding"
-  # }
   ingress {
     protocol    = "tcp"
     from_port   = 17000
-    to_port     = 17004
+    to_port     = 17003
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
     description = "Launcher Listening Port, Deadline Auto Config Port, Deadline Worker / Slave Startup Port"
   }
-  ingress {
-    protocol    = "tcp"
-    from_port   = 1715
-    to_port     = 1715
-    cidr_blocks = var.permitted_cidr_list
-    # security_groups = var.security_group_ids
-    description = "Hserver port for UBL"
-  }
-  
-  # ingress {
-  #   protocol    = "tcp"
-  #   from_port   = 17001
-  #   to_port     = 17001
-  #   cidr_blocks = var.permitted_cidr_list
-  #   # security_groups = var.security_group_ids
-  #   description = "Deadline Auto Config Port"
-  # }
-  # ingress {
-  #   protocol    = "tcp"
-  #   from_port   = 17003
-  #   to_port     = 17003
-  #   cidr_blocks = var.permitted_cidr_list
-  #   # security_groups = var.security_group_ids
-  #   description = "Deadline Worker / Slave Startup Port"
-  # }
   ingress {
     protocol    = "tcp"
     from_port   = 27100
@@ -78,8 +80,16 @@ resource "aws_security_group" "deadline_db_vault_client" {
     to_port     = 8080
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
-    description = "Deadline HTTP port"
+    description = "Deadline RCS port"
   }
+  # ingress {
+  #   protocol    = "tcp"
+  #   from_port   = 8082
+  #   to_port     = 8082
+  #   cidr_blocks = var.permitted_cidr_list
+  #   # security_groups = var.security_group_ids
+  #   description = "Deadline Web Service port"
+  # }
   ingress {
     protocol    = "tcp"
     from_port   = 4433
@@ -87,6 +97,14 @@ resource "aws_security_group" "deadline_db_vault_client" {
     cidr_blocks = var.permitted_cidr_list
     # security_groups = var.security_group_ids
     description = "Deadline TLS port"
+  }
+  ingress {
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
+    cidr_blocks = var.permitted_cidr_list
+    # security_groups = var.security_group_ids
+    description = "Deadline UBL port"
   }
   ingress {
     protocol    = "icmp"
@@ -152,20 +170,21 @@ data "aws_subnet" "private" {
   id = var.private_subnet_ids[0]
 }
 locals {
-  private_subnet_cidr_block                  = data.aws_subnet.private.cidr_block
-  private_ip                                 = cidrhost(local.private_subnet_cidr_block, var.host_number)
-  resourcetier                               = var.common_tags["resourcetier"]
-  id                                         = element(concat(aws_instance.deadline_db_vault_client.*.id, list("")), 0)
-  deadline_db_vault_client_security_group_id = element(concat(aws_security_group.deadline_db_vault_client.*.id, list("")), 0)
-  vpc_security_group_ids                     = [local.deadline_db_vault_client_security_group_id]
-  client_cert_file_path                      = "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
-  client_cert_vault_path                     = "${local.resourcetier}/deadline/client_cert_files${local.client_cert_file_path}"
+  private_subnet_cidr_block                    = data.aws_subnet.private.cidr_block
+  private_ip                                   = cidrhost(local.private_subnet_cidr_block, var.host_number)
+  resourcetier                                 = var.common_tags["resourcetier"]
+  id                                           = length(aws_instance.deadline_db_instance) > 0 ? aws_instance.deadline_db_instance[0].id : null
+  deadline_db_instance_security_group_id       = length(aws_security_group.deadline_db_instance) > 0 ? aws_security_group.deadline_db_instance[0].id : null
+  deadline_license_forwarder_security_group_id = length(aws_security_group.deadline_license_forwarder) > 0 ? aws_security_group.deadline_license_forwarder[0].id : null
+  client_cert_file_path                        = "/opt/Thinkbox/certs/Deadline10RemoteClient.pfx"
+  client_cert_vault_path                       = "${local.resourcetier}/deadline/client_cert_files${local.client_cert_file_path}"
+  common_tags                                  = merge(tomap({ "Name" : var.name }), var.common_tags, local.extra_tags)
   extra_tags = {
-    role  = "deadline_db_vault_client"
+    role  = "deadline_db_instance"
     route = "private"
   }
 }
-resource "aws_instance" "deadline_db_vault_client" {
+resource "aws_instance" "deadline_db_instance" {
   depends_on             = [aws_s3_bucket_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
   private_ip             = local.private_ip # Deadline DB is not configured for HA
@@ -173,10 +192,10 @@ resource "aws_instance" "deadline_db_vault_client" {
   instance_type          = var.instance_type
   key_name               = var.aws_key_name # The PEM key is disabled for use in production, can be used for debugging.  Instead, signed SSH certificates should be used to access the host.
   subnet_id              = data.aws_subnet.private.id
-  tags                   = merge(map("Name", var.name), var.common_tags, local.extra_tags)
+  tags                   = local.common_tags
   user_data              = data.template_file.user_data_auth_client.rendered
   iam_instance_profile   = data.terraform_remote_state.deadline_db_profile.outputs.instance_profile_name
-  vpc_security_group_ids = local.vpc_security_group_ids
+  vpc_security_group_ids = [local.deadline_db_instance_security_group_id, local.deadline_license_forwarder_security_group_id]
   root_block_device {
     delete_on_termination = true
   }

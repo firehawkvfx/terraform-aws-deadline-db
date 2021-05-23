@@ -89,3 +89,22 @@ vault token revoke -self
 ### Install Deadline # Generate certs after install test
 sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs
 
+echo "...Determining if ubl certs have been provided"
+ubl_certs_bucket=${ubl_certs_bucket}
+output=$(aws s3api head-object --bucket "$ubl_certs_bucket" --key "ublcertszip/certs.zip") && exit_status=0 || exit_status=$?
+
+if [[ $exit_status -eq 0 ]]; then
+  echo "...Retrieving Certs"
+  cd /opt/Thinkbox/certs
+  aws s3api get-object --bucket "$ubl_certs_bucket" --key "ublcertszip/certs.zip" "ublcerts.zip"
+  unzip ublcerts.zip -d ublcerts
+  chown -R $deadlineuser_name:$deadlineuser_name /opt/Thinkbox/certs/ublcerts/
+  chmod -R 600 /opt/Thinkbox/certs/ublcerts/
+  chmod 700 /opt/Thinkbox/certs/ublcerts
+
+  ulimit -n 64000 # configure limits https://docs.thinkboxsoftware.com/products/deadline/10.0/1_User%20Manual/manual/license-forwarder.html
+else
+  echo "...Skipping configuring UBL license forwarder.  No certs found in $ubl_certs_bucket at ublcertszip/certs.zip"
+fi
+
+# need to exec ./deadlinelicenseforwarder -sslpath /opt/Thinkbox/certs/ublcerts or add to deadline config for client
