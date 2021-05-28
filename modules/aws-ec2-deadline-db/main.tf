@@ -49,13 +49,13 @@ resource "aws_security_group" "deadline_db_instance" { # see https://docs.thinkb
     cidr_blocks = var.permitted_cidr_list_private
     description = "all incoming traffic from vpc, vpn dhcp, and remote subnet"
   }
-  ingress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "WARNING: TESTING ONLY"
-  }
+  # ingress {
+  #   protocol    = "-1"
+  #   from_port   = 0
+  #   to_port     = 0
+  #   cidr_blocks = ["0.0.0.0/0"]
+  #   description = "WARNING: TESTING ONLY"
+  # }
   ingress {
     protocol        = "tcp"
     from_port       = 22
