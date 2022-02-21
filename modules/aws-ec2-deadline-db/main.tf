@@ -131,7 +131,7 @@ resource "aws_security_group" "deadline_db_instance" { # see https://docs.thinkb
 data "aws_s3_bucket" "software_bucket" {
   bucket = "software.${var.bucket_extension}"
 }
-resource "aws_s3_bucket_object" "update_scripts" {
+resource "aws_s3_object" "update_scripts" {
   for_each = fileset("${path.module}/scripts/", "*")
   bucket   = data.aws_s3_bucket.software_bucket.id
   key      = each.value
