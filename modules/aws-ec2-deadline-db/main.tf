@@ -192,7 +192,7 @@ locals {
   }
 }
 resource "aws_instance" "deadline_db_instance" {
-  depends_on             = [aws_s3_bucket_object.update_scripts]
+  depends_on             = [aws_s3_object.update_scripts]
   count                  = var.create_vpc ? 1 : 0
   private_ip             = local.private_ip # Deadline DB is not configured for HA
   ami                    = var.deadline_db_ami_id
