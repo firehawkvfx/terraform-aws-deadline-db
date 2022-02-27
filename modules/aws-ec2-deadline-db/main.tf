@@ -60,7 +60,6 @@ resource "aws_security_group" "deadline_db_instance" { # see https://docs.thinkb
     protocol        = "tcp"
     from_port       = 22
     to_port         = 22
-    cidr_blocks     = var.permitted_cidr_list
     security_groups = var.security_group_ids
     description     = "SSH"
   }
