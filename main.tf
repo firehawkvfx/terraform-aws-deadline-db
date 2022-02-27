@@ -78,8 +78,8 @@ module "deadline_db_instance" {
   permitted_cidr_list         = ["${local.onsite_public_ip}/32", var.remote_cloud_public_ip_cidr, var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr, data.aws_vpc.rendervpc.cidr_block, data.aws_vpc.vaultvpc.cidr_block]
   permitted_cidr_list_private = [var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr]
   security_group_ids = [
-    try(data.terraform_remote_state.bastion_security_group.outputs.security_group_id,null),
-    try(data.terraform_remote_state.vpn_security_group.outputs.security_group_id,null),
+    data.terraform_remote_state.bastion_security_group.outputs.security_group_id,
+    data.terraform_remote_state.vpn_security_group.outputs.security_group_id,
   ]
   aws_key_name     = var.aws_key_name
   common_tags      = local.common_tags

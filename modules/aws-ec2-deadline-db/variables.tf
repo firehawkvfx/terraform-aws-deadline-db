@@ -35,7 +35,7 @@ variable "permitted_cidr_list_private" {
 variable "security_group_ids" {
   description = "The list of security group ID's that have SSH access to the node"
   type        = list(string)
-  default     = null
+  # default     = null
 }
 variable "aws_key_name" {
   description = "The name of the AWS PEM key for access to the VPN instance"
