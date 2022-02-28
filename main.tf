@@ -3,13 +3,34 @@ provider "null" {}
 provider "aws" {}
 
 data "aws_region" "current" {}
+
+data "terraform_remote_state" "rendervpc" {
+  backend = "s3"
+  config = {
+    bucket = "state.terraform.${var.bucket_extension}"
+    key    = "firehawk-render-cluster/modules/terraform-aws-render-vpc/terraform.tfstate"
+    region = data.aws_region.current.name
+  }
+}
+data "terraform_remote_state" "vaultvpc" {
+  backend = "s3"
+  config = {
+    bucket = "state.terraform.${var.bucket_extension}"
+    key    = "firehawk-main/modules/vpc/terraform.tfstate"
+    region = data.aws_region.current.name
+  }
+}
 data "aws_vpc" "rendervpc" {
+  count = length(data.terraform_remote_state.rendervpc.outputs.vpc_id) > 0 ? 1 : 0
   default = false
-  tags    = var.common_tags_rendervpc
+  vpc_id = data.terraform_remote_state.rendervpc.outputs.vpc_id
+  # tags    = var.common_tags_rendervpc
 }
 data "aws_vpc" "vaultvpc" {
+  count = length(data.terraform_remote_state.vaultvpc.outputs.vpc_id) > 0 ? 1 : 0
   default = false
-  tags    = var.common_tags_vaultvpc
+  vpc_id = data.terraform_remote_state.vaultvpc.outputs.vpc_id
+  # tags    = var.common_tags_vaultvpc
 }
 data "aws_subnet_ids" "public" {
   vpc_id = data.aws_vpc.rendervpc.id
