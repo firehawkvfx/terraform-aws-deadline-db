@@ -38,7 +38,7 @@ data "aws_subnet_ids" "public" {
   tags   = tomap({"area": "public"})
 }
 data "aws_subnet" "public" {
-  for_each = data.aws_subnet_ids.public.ids
+  for_each = length(data.aws_subnet_ids.public) > 0 ? data.aws_subnet_ids.public[0].ids : []
   id       = each.value
 }
 data "aws_subnet_ids" "private" {
@@ -47,7 +47,7 @@ data "aws_subnet_ids" "private" {
   tags   = tomap({"area": "private"})
 }
 data "aws_subnet" "private" {
-  for_each = data.aws_subnet_ids.private.ids
+  for_each = length(data.aws_subnet_ids.private) > 0 ? data.aws_subnet_ids.private[0].ids : []
   id       = each.value
 }
 data "aws_route_tables" "public" {
