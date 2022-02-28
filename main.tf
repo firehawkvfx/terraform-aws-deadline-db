@@ -23,13 +23,13 @@ data "terraform_remote_state" "vaultvpc" {
 data "aws_vpc" "rendervpc" {
   count = length(data.terraform_remote_state.rendervpc.outputs.vpc_id) > 0 ? 1 : 0
   default = false
-  vpc_id = data.terraform_remote_state.rendervpc.outputs.vpc_id
+  id = data.terraform_remote_state.rendervpc.outputs.vpc_id
   # tags    = var.common_tags_rendervpc
 }
 data "aws_vpc" "vaultvpc" {
   count = length(data.terraform_remote_state.vaultvpc.outputs.vpc_id) > 0 ? 1 : 0
   default = false
-  vpc_id = data.terraform_remote_state.vaultvpc.outputs.vpc_id
+  id = data.terraform_remote_state.vaultvpc.outputs.vpc_id
   # tags    = var.common_tags_vaultvpc
 }
 data "aws_subnet_ids" "public" {
