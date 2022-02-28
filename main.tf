@@ -33,7 +33,8 @@ data "aws_vpc" "vaultvpc" {
   # tags    = var.common_tags_vaultvpc
 }
 data "aws_subnet_ids" "public" {
-  vpc_id = data.aws_vpc.rendervpc.id
+  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
+  vpc_id = data.aws_vpc.rendervpc[0].id
   tags   = tomap({"area": "public"})
 }
 data "aws_subnet" "public" {
@@ -41,7 +42,8 @@ data "aws_subnet" "public" {
   id       = each.value
 }
 data "aws_subnet_ids" "private" {
-  vpc_id = data.aws_vpc.rendervpc.id
+  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
+  vpc_id = data.aws_vpc.rendervpc[0].id
   tags   = tomap({"area": "private"})
 }
 data "aws_subnet" "private" {
@@ -49,11 +51,13 @@ data "aws_subnet" "private" {
   id       = each.value
 }
 data "aws_route_tables" "public" {
-  vpc_id = data.aws_vpc.rendervpc.id
+  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
+  vpc_id = data.aws_vpc.rendervpc[0].id
   tags   = tomap({"area": "public"})
 }
 data "aws_route_tables" "private" {
-  vpc_id = data.aws_vpc.rendervpc.id
+  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
+  vpc_id = data.aws_vpc.rendervpc[0].id
   tags   = tomap({"area": "private"})
 }
 data "terraform_remote_state" "bastion_security_group" { # read the arn with data.terraform_remote_state.packer_profile.outputs.instance_role_arn, or read the profile name with data.terraform_remote_state.packer_profile.outputs.instance_profile_name
@@ -76,7 +80,7 @@ data "terraform_remote_state" "vpn_security_group" { # read the arn with data.te
 locals {
   common_tags                = var.common_tags
   mount_path                 = var.resourcetier
-  vpc_id                     = data.aws_vpc.rendervpc.id
+  vpc_id                     = length(data.aws_vpc.rendervpc) > 0 ? data.aws_vpc.rendervpc[0].id : ""
   vpn_cidr                   = var.vpn_cidr
   onsite_private_subnet_cidr = var.onsite_private_subnet_cidr
   private_subnet_ids         = tolist(data.aws_subnet_ids.private.ids)
@@ -96,7 +100,7 @@ module "deadline_db_instance" {
   bucket_extension            = var.bucket_extension
   bucket_extension_vault      = var.bucket_extension_vault
   private_subnet_ids          = local.private_subnet_ids
-  permitted_cidr_list         = ["${local.onsite_public_ip}/32", var.remote_cloud_public_ip_cidr, var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr, data.aws_vpc.rendervpc.cidr_block, data.aws_vpc.vaultvpc.cidr_block]
+  permitted_cidr_list         = ["${local.onsite_public_ip}/32", var.remote_cloud_public_ip_cidr, var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr, data.aws_vpc.rendervpc[0].cidr_block, data.aws_vpc.vaultvpc[0].cidr_block]
   permitted_cidr_list_private = [var.remote_cloud_private_ip_cidr, local.onsite_private_subnet_cidr, local.vpn_cidr]
   security_group_ids = [
     data.terraform_remote_state.bastion_security_group.outputs.security_group_id,
