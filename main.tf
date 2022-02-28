@@ -86,7 +86,7 @@ locals {
   private_subnet_ids         = tolist(data.aws_subnet_ids.private.ids)
   private_subnet_cidr_blocks = [for s in data.aws_subnet.private : s.cidr_block]
   onsite_public_ip           = var.onsite_public_ip
-  private_route_table_ids    = data.aws_route_tables.private.ids
+  private_route_table_ids    = length(data.aws_route_tables.private) > 0 ? data.aws_route_tables.private.ids : []
   instance_name              = "${lookup(local.common_tags, "vpcname", "default")}_deadlinedbvaultclient_pipeid${lookup(local.common_tags, "pipelineid", "0")}"
 }
 module "deadline_db_instance" {
