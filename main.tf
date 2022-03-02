@@ -30,22 +30,30 @@ data "aws_vpc" "vaultvpc" {
   default = false
   id = data.terraform_remote_state.vaultvpc.outputs.vpc_id
 }
-data "aws_subnet_ids" "public" {
-  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
-  vpc_id = data.aws_vpc.rendervpc[0].id
-  tags   = tomap({"area": "public"})
+data "aws_subnets" "public" {
+  filter {
+    name   = "vpc-id"
+    values = length(data.aws_vpc.rendervpc) > 0 ? [data.aws_vpc.rendervpc[0].id] : []
+  }
+  tags = {
+    area = "public"
+  }
 }
 data "aws_subnet" "public" {
-  for_each = length(data.aws_subnet_ids.public) > 0 ? data.aws_subnet_ids.public[0].ids : []
+  for_each = toset(data.aws_subnets.public)
   id       = each.value
 }
-data "aws_subnet_ids" "private" {
-  count = length(data.aws_vpc.rendervpc) > 0 ? 1 : 0
-  vpc_id = data.aws_vpc.rendervpc[0].id
-  tags   = tomap({"area": "private"})
+data "aws_subnets" "private" {
+  filter {
+    name   = "vpc-id"
+    values = length(data.aws_vpc.rendervpc) > 0 ? [data.aws_vpc.rendervpc[0].id] : []
+  }
+  tags = {
+    area = "private"
+  }
 }
 data "aws_subnet" "private" {
-  for_each = length(data.aws_subnet_ids.private) > 0 ? data.aws_subnet_ids.private[0].ids : []
+  for_each = toset(data.aws_subnets.private.ids)
   id       = each.value
 }
 data "aws_route_tables" "public" {
@@ -81,7 +89,7 @@ locals {
   vpc_id                     = length(data.aws_vpc.rendervpc) > 0 ? data.aws_vpc.rendervpc[0].id : ""
   vpn_cidr                   = var.vpn_cidr
   onsite_private_subnet_cidr = var.onsite_private_subnet_cidr
-  private_subnet_ids         = tolist(data.aws_subnet_ids.private[0].ids)
+  private_subnet_ids         = tolist(data.aws_subnets.private.ids)
   private_subnet_cidr_blocks = [for s in data.aws_subnet.private : s.cidr_block]
   onsite_public_ip           = var.onsite_public_ip
   private_route_table_ids    = length(data.aws_route_tables.private) > 0 ? data.aws_route_tables.private[0].ids : []
