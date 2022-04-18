@@ -110,7 +110,7 @@ fi
 
 # if debugging the install script, it is possible to test without rebuilding image.
 rm -fr /var/tmp/aws-thinkbox-deadline
-cd /var/tmp; git clone --branch v0.0.3 https://github.com/firehawkvfx/aws-thinkbox-deadline.git
+cd /var/tmp; git clone --branch v0.0.13 https://github.com/firehawkvfx/aws-thinkbox-deadline.git
 sudo chown -R $deadlineuser_name:$deadlineuser_name /var/tmp/aws-thinkbox-deadline
 
 ### Install Deadline # Generate certs after install test
