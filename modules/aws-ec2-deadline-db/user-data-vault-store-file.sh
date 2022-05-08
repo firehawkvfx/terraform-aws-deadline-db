@@ -60,7 +60,7 @@ retry \
 # if debugging the install script, it is possible to test without rebuilding image.
 rm -fr /var/tmp/firehawk-main
 cd /var/tmp; git clone --branch main https://github.com/firehawkvfx/firehawk-main.git
-echo "...Store certificate."
+echo "...Store certificate with script." "$client_cert_file_path" "$client_cert_vault_path" "$resourcetier" "$VAULT_ADDR"
 /var/tmp/firehawk-main/scripts/store_file.sh "$client_cert_file_path" "$client_cert_vault_path" "$resourcetier" "$VAULT_ADDR"
 
 echo "Revoking vault token..."
