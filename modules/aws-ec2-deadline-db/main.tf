@@ -142,8 +142,8 @@ data "template_file" "user_data_auth_client" {
     "%s%s%s%s",
     file("${path.module}/user-data-iam-auth-ssh-host-consul.sh"),
     file("${path.module}/user-data-install-deadline-db.sh"),
+    file("${path.module}/user-data-vault-store-file.sh"),
     file("${path.module}/user-data-register-consul-service.sh"),
-    file("${path.module}/user-data-vault-store-file.sh")
   )
   vars = {
     consul_cluster_tag_key   = var.consul_cluster_tag_key
