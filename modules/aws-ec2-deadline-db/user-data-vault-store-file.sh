@@ -59,7 +59,9 @@ function store_file {
     local target="$2"
   fi
   if sudo test -f "$file_path"; then
-    vault kv put -address="$VAULT_ADDR" "$target/file" value="$(sudo cat $file_path | base64 -w 0)"
+    $file_content="$(sudo cat $file_path | base64 -w 0)"
+    vault kv put -address="$VAULT_ADDR" "$target/file" value="$file_content"
+
     if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
         octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
     else
@@ -75,8 +77,23 @@ function store_file {
       \"gid\":\"$file_gid\", \
       \"format\":\"base64\" \
     }"
-    jq_parse=$( echo "$blob" | jq -c -r '.' )
-    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" value="$jq_parse"
+    parsed_metadata=$( echo "$blob" | jq -c -r '.' )
+    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" value="$parsed_metadata"
+
+    # the certificate can be stored with secrets manager for systems that are unable to use ssh certificates (Windows powershell)
+    echo "Will store file with SSM Secrets Manager"
+    store=$(echo "{ \"file\" : \"$file_content\", \"permissions\" : \"$parsed_metadata\" }" | jq -r '.') && exit_status=0 || exit_status=$?
+    
+    if [[ ! $exit_status -eq 0 ]]; then
+      echo ""
+      echo "Error: formatting json to store token with jq:"
+      echo "jq returned: $result"
+      exit 1
+    fi
+
+    aws secretsmanager put-secret-value \
+        --secret-id "/firehawk/resourcetier/${TF_VAR_resourcetier}/file_deadline_cert_content" \
+        --secret-string "$store"
   else
     print "Error: file not found: $file_path"
     exit 1
