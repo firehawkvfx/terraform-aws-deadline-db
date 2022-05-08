@@ -51,61 +51,17 @@ function retry {
   log "$description failed after $attempts attempts."
   exit $exit_status
 }
-function store_file {
-  local -r file_path="$1"
-  if [[ -z "$2" ]]; then
-    local target="$resourcetier/vpn/client_cert_files/$file_path"
-  else
-    local target="$2"
-  fi
-  if sudo test -f "$file_path"; then
-    $file_content="$(sudo cat $file_path | base64 -w 0)"
-    vault kv put -address="$VAULT_ADDR" "$target/file" value="$file_content"
-
-    if [[ "$OSTYPE" == "darwin"* ]]; then # Acquire file permissions.
-        octal_permissions=$(sudo stat -f %A $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev ) # clip to 4 zeroes
-    else
-        octal_permissions=$(sudo stat --format '%a' $file_path | rev | sed -E 's/^([[:digit:]]{4})([^[:space:]]+)/\1/' | rev) # clip to 4 zeroes
-    fi
-    octal_permissions=$( python3 -c "print( \"$octal_permissions\".zfill(4) )" ) # pad to 4 zeroes
-    file_uid="$(sudo stat --format '%u' $file_path)"
-    file_gid="$(sudo stat --format '%g' $file_path)"
-    blob="{ \
-      \"permissions\":\"$octal_permissions\", \
-      \"owner\":\"$(sudo id -un -- $file_uid)\", \
-      \"uid\":\"$file_uid\", \
-      \"gid\":\"$file_gid\", \
-      \"format\":\"base64\" \
-    }"
-    parsed_metadata=$( echo "$blob" | jq -c -r '.' )
-    vault kv put -address="$VAULT_ADDR" -format=json "$target/permissions" value="$parsed_metadata"
-
-    # the certificate can be stored with secrets manager for systems that are unable to use ssh certificates (Windows powershell)
-    echo "Will store file with SSM Secrets Manager"
-    store=$(echo "{ \"file\" : \"$file_content\", \"permissions\" : \"$parsed_metadata\" }" | jq -r '.') && exit_status=0 || exit_status=$?
-    
-    if [[ ! $exit_status -eq 0 ]]; then
-      echo ""
-      echo "Error: formatting json to store token with jq:"
-      echo "jq returned: $result"
-      exit 1
-    fi
-
-    aws secretsmanager put-secret-value \
-        --secret-id "/firehawk/resourcetier/$resourcetier/file_deadline_cert_content" \
-        --secret-string "$store"
-  else
-    print "Error: file not found: $file_path"
-    exit 1
-  fi
-}
 
 ### Vault Auth IAM Method CLI
 retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
-# Store generated certs in vault
+
+# if debugging the install script, it is possible to test without rebuilding image.
+rm -fr /var/tmp/firehawk-main
+cd /var/tmp; git clone --branch main https://github.com/firehawkvfx/firehawk-main.git
 echo "...Store certificate."
-store_file "$client_cert_file_path" "$client_cert_vault_path"
+/var/tmp/firehawk-main/scripts/store_file.sh "$client_cert_file_path" "$client_cert_vault_path" "$resourcetier" "$VAULT_ADDR"
+
 echo "Revoking vault token..."
 vault token revoke -self
