@@ -92,7 +92,7 @@ function store_file {
     fi
 
     aws secretsmanager put-secret-value \
-        --secret-id "/firehawk/resourcetier/${TF_VAR_resourcetier}/file_deadline_cert_content" \
+        --secret-id "/firehawk/resourcetier/$resourcetier/file_deadline_cert_content" \
         --secret-string "$store"
   else
     print "Error: file not found: $file_path"
