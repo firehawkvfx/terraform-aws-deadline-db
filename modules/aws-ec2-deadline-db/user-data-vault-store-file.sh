@@ -57,6 +57,7 @@ retry \
   "vault login --no-print -method=aws header_value=vault.service.consul role=${example_role_name}" \
   "Waiting for Vault login"
 
+set -x
 # if debugging the install script, it is possible to test without rebuilding image.
 rm -fr /var/tmp/firehawk-main
 cd /var/tmp; git clone --branch main https://github.com/firehawkvfx/firehawk-main.git
