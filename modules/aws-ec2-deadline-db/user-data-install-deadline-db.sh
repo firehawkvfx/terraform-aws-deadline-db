@@ -110,10 +110,12 @@ fi
 
 # if debugging the install script, it is possible to test without rebuilding image.
 rm -fr /var/tmp/aws-thinkbox-deadline
-cd /var/tmp; git clone --branch main https://github.com/firehawkvfx/aws-thinkbox-deadline.git
+instance_id_this_instance=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+firehawk_deadline_installer_version="$(aws ec2 describe-tags --filters Name=resource-id,Values=$instance_id_this_instance --out=json|jq '.Tags[]| select(.Key == "firehawk_deadline_installer_version")|.Value' --raw-output)"
+cd /var/tmp; git clone --branch $firehawk_deadline_installer_version https://github.com/firehawkvfx/aws-thinkbox-deadline.git
 sudo chown -R $deadlineuser_name:$deadlineuser_name /var/tmp/aws-thinkbox-deadline
 
 ### Install Deadline # Generate certs after install test
 set -x
-sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs --license-forwarder "$license_forwarder"
+sudo -i -u $deadlineuser_name $installer_path --deadline-version "$deadline_version" --db-host-name "${db_host_name}" --skip-download-installers --skip-install-packages --skip-install-db --post-certgen-db --skip-install-rcs --post-certgen-rcs --configure-path-mapping --license-forwarder "$license_forwarder"
 set +x
