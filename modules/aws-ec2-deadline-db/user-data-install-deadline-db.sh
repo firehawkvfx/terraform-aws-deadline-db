@@ -108,12 +108,14 @@ else
   echo "...Skipping configuring UBL license forwarder.  No certs found in $ubl_certs_bucket at ublcertszip/certs.zip"
 fi
 
-# if debugging the install script, it is possible to test without rebuilding image.
-rm -fr /var/tmp/aws-thinkbox-deadline
-instance_id_this_instance=$(curl http://169.254.169.254/latest/meta-data/instance-id)
-firehawk_deadline_installer_version="$(aws ec2 describe-tags --filters Name=resource-id,Values=$instance_id_this_instance --out=json|jq '.Tags[]| select(.Key == "firehawk_deadline_installer_version")|.Value' --raw-output)"
-cd /var/tmp; git clone --branch $firehawk_deadline_installer_version https://github.com/firehawkvfx/aws-thinkbox-deadline.git
-sudo chown -R $deadlineuser_name:$deadlineuser_name /var/tmp/aws-thinkbox-deadline
+# # If debugging the install script, it is possible to test without rebuilding image.
+# rm -fr /var/tmp/aws-thinkbox-deadline
+# instance_id_this_instance=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+# ami_id_this_instance=$(curl http://169.254.169.254/latest/meta-data/ami-id)
+# # This wont actually work because you need to query tags on the ami
+# firehawk_deadline_installer_version="$(aws ec2 describe-tags --filters Name=resource-id,Values=$instance_id_this_instance --out=json|jq '.Tags[]| select(.Key == "firehawk_deadline_installer_version")|.Value' --raw-output)"
+# cd /var/tmp; git clone --branch $firehawk_deadline_installer_version https://github.com/firehawkvfx/aws-thinkbox-deadline.git
+# sudo chown -R $deadlineuser_name:$deadlineuser_name /var/tmp/aws-thinkbox-deadline
 
 ### Install Deadline # Generate certs after install test
 set -x
